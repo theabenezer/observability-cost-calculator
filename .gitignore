@@ -1,0 +1,10 @@
+# local and internal material stays out of the public repository
+.DS_Store
+.claude/
+IT OB COST*/
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+observability-cost-calculator-methodology.md
+observability-cost-calculator.html

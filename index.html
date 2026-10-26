@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observability Cost Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light only;--bg:#fff;--layer:#f4f4f4;--text:#161616;--text-2:#525252;--border:#e0e0e0;--interactive:#0f62fe;--sans:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:1rem;line-height:1.5;padding:0 2rem 3rem}
+.wrap{max-width:1312px;margin:0 auto}
+.top{display:flex;align-items:baseline;gap:.75rem;height:3rem;border-bottom:1px solid var(--border);font-size:.875rem}
+.top b{font-weight:600;letter-spacing:.02em}.top span{color:var(--text-2)}
+h1{font-size:clamp(2rem,4.2vw,3.375rem);font-weight:300;line-height:1.15;letter-spacing:-.01em;margin:3rem 0 1rem}
+p.lead{color:var(--text-2);font-size:1.125rem;max-width:66ch;margin:0 0 2.5rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem}
+a.card{display:grid;gap:.5rem;padding:1.5rem;background:var(--layer);color:var(--text);text-decoration:none;min-height:11rem;border-bottom:3px solid transparent;align-content:start}
+a.card:hover{border-bottom-color:var(--interactive)}
+a.card b{font-size:1.25rem;font-weight:400}
+a.card span{color:var(--text-2);font-size:.9375rem}
+a.card em{font-style:normal;color:var(--interactive);margin-top:auto;font-size:.875rem}
+footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-2);font-size:.8125rem;max-width:80ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><b>IBM</b><span>Observability cost calculator</span></header>
+  <h1>Are you paying too much for observability?</h1>
+  <p class="lead">Seven quick questions at public list prices. Pick the calculator for the platform you use today to see what it costs, what the same coverage costs on IBM Concert, and where to look first.</p>
+  <div class="grid">
+    <a class="card" href="observability-cost-calculator-datadog.html"><b>Datadog</b><span>Datadog vs IBM Concert, observability tools at list prices, with the cloud saving from Concert Optimize shown separately.</span><em>Open the Datadog calculator →</em></a>
+    <a class="card" href="observability-cost-calculator-dynatrace.html"><b>Dynatrace</b><span>Dynatrace vs IBM Concert, observability tools at list prices, with the cloud saving from Concert Optimize shown separately.</span><em>Open the Dynatrace calculator →</em></a>
+    <a class="card" href="observability-cost-calculator-datadog-dynatrace.html"><b>Datadog or Dynatrace</b><span>One page for both platforms, observability tools at list prices.</span><em>Open the two-platform calculator →</em></a>
+    <a class="card" href="observability-cost-calculator-all-platforms.html"><b>All platforms, net benefit</b><span>Datadog, Dynatrace, New Relic, Grafana Cloud or Splunk Observability vs IBM Concert, with the net benefit of Observe + Optimize.</span><em>Open the all-platforms calculator →</em></a>
+  </div>
+  <footer>Estimates for IBM Concert platform Observe + Optimize capabilities, powered by IBM Instana and IBM Turbonomic, priced at Instana and Turbonomic public list prices. List prices in USD as published by each vendor, checked 18 to 23 October 2026. Estimates for conversation, not quotes.</footer>
+</div>
+</body>
+</html>

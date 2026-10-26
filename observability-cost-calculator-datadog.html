@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Observability Cost Calculator: Datadog vs IBM Concert</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: IBM Carbon white theme (Gray 100 in dark). Questions left, result right. One page, no wizard. */
+/* Light mode only: the dark palette was removed on request, so the page renders light regardless of system or viewer theme. */
+:root,:root[data-theme="dark"]{
+  color-scheme:light only;
+  --bg:#ffffff; --layer:#f4f4f4; --layer-2:#ffffff; --layer-hover:#e8e8e8; --field:#f4f4f4;
+  --border-subtle:#e0e0e0; --border-strong:#8d8d8d; --border-inverse:#161616;
+  --text:#161616; --text-2:#525252; --text-3:#6f6f6f; --text-placeholder:#a8a8a8; --text-disabled:#c6c6c6; --text-on-color:#ffffff;
+  --interactive:#0f62fe; --interactive-hover:#0353e9; --interactive-active:#002d9c; --link:#0f62fe; --link-hover:#0043ce;
+  --blue-tint:#edf5ff; --blue-text:#0043ce;
+  --info:#0043ce; --info-tint:#edf5ff; --success:#24a148; --success-tint:#defbe6; --success-text:#0e6027;
+  --warning:#f1c21b; --warning-tint:#fcf4d6; --warning-text:#8e6a00; --error:#da1e28; --error-tint:#fff1f1; --error-text:#a2191f;
+  --focus:#0f62fe; --inverse-bg:#393939; --inverse-text:#ffffff;
+  /* chart series: Carbon hue steps, validated for adjacent-pair colorblind separation on the white surface */
+  --s1:#8a3ffc; --s2:#0072c3; --s3:#009d9a; --s4:#d02670; --s5:#eb6200; --s6:#24a148; --s-dd:#525252;
+  --s-ibm:#0f62fe; --s-ibm-logs:#002d9c; --s-turbo:#78a9ff;
+  --chart-grid:#e0e0e0;
+  --sans:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:.875rem;line-height:1.43;-webkit-font-smoothing:antialiased;padding-inline:2rem}
+@media (max-width:640px){body{padding-inline:1rem}}
+a{color:var(--link)} a:hover{color:var(--link-hover)}
+.wrap{max-width:1312px;margin:0 auto}
+h1,h2,h3{margin:0;font-weight:400;text-wrap:balance}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.btn:focus-visible{outline:none;box-shadow:inset 0 0 0 1px var(--focus),inset 0 0 0 3px var(--bg)}
+a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:1rem;height:3rem;border-bottom:1px solid var(--border-subtle)}
+.brand{display:flex;align-items:baseline;gap:.75rem;font-size:.875rem}
+.brand .ibm{font-weight:600;letter-spacing:.02em}
+.brand .name{color:var(--text-2)}
+.top .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-3)}
+@media (max-width:640px){.top .meta{display:none}}
+
+/* notification */
+.notif{display:flex;gap:.75rem;align-items:center;border-left:3px solid var(--warning);background:var(--warning-tint);padding:.875rem 0 .875rem 1rem;margin-top:1rem;font-size:.875rem;min-height:3rem}
+.notif svg{flex:none}
+.notif b{font-weight:600}
+.notif .x{margin-left:auto;width:3rem;height:3rem;display:grid;place-items:center;background:none;border:0;color:var(--text);cursor:pointer;font:inherit;font-size:1.25rem;padding:0;flex:none}
+.notif .x:hover{background:var(--layer-hover)}
+
+/* hero */
+.hero{padding:2.5rem 0 1.5rem}
+@media (max-width:900px){.hero{padding:1.75rem 0 1rem}}
+.hero h1{font-size:clamp(2rem,4.2vw,3.375rem);line-height:1.15;font-weight:300;letter-spacing:-.01em;margin-bottom:1rem}
+.hero p{margin:0;color:var(--text-2);font-size:1.125rem;line-height:1.5;max-width:66ch}
+.hero .how{border-top:1px solid var(--border-subtle);padding-top:.75rem;font-size:.8125rem;color:var(--text-3);display:grid;gap:.35rem}
+.hero .how b{color:var(--text);font-weight:500}
+
+/* grid */
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3rem;align-items:start;border-top:1px solid var(--text);padding-top:2rem}
+@media (max-width:1000px){.main{grid-template-columns:1fr}}
+
+/* questions */
+.qhead{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.qhead h2{font-size:1.75rem;font-weight:400;line-height:1.28}
+.tag{display:inline-flex;align-items:center;gap:.35rem;min-height:1.5rem;padding:.1rem .5rem;border-radius:1rem;font-size:.75rem;background:var(--layer);color:var(--text-2)}
+.tag.blue{background:var(--blue-tint);color:var(--blue-text)}
+.q{border-top:1px solid var(--border-subtle);padding:2rem 0 2.5rem;display:grid;grid-template-columns:3rem 1fr;gap:.5rem 1rem}
+.q>div{min-width:0}
+@media (max-width:640px){.q{grid-template-columns:1fr;padding:1.5rem 0 1.75rem} .lab{font-size:1.125rem} .qhead h2{font-size:1.5rem}}
+.q .n{font-family:var(--mono);font-size:.875rem;color:var(--text-2);padding-top:.45rem}
+@media (max-width:640px){.q .n{display:none}}
+.q .lab{font-size:1.25rem;font-weight:400;line-height:1.4}
+.q .help{font-size:.875rem;color:var(--text-2);line-height:1.43;margin:.5rem 0 1.25rem;max-width:56ch}
+.q .ctl{display:grid;gap:1rem}
+
+/* inputs */
+.num{display:flex;align-items:stretch;background:var(--field);border-bottom:1px solid var(--border-strong);height:3rem;max-width:24rem}
+@media (max-width:640px){.num{max-width:100%}}
+.num .pre{display:flex;align-items:center;padding:0 0 0 1rem;color:var(--text-2);font-size:1rem}
+.num input{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:1rem;padding:0 1rem;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield}
+.num input::-webkit-inner-spin-button,.num input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.num input::placeholder{color:var(--text-placeholder)}
+.num input:focus{outline:none}
+.num:focus-within{outline:2px solid var(--focus);outline-offset:-2px}
+.num .suf{display:flex;align-items:center;padding:0 1rem;color:var(--text-2);font-size:.875rem;white-space:nowrap}
+.num .step{width:3rem;border:0;border-left:1px solid var(--border-subtle);background:transparent;color:var(--text);cursor:pointer;font:inherit;font-size:1.25rem}
+.num .step:hover{background:var(--layer-hover)}
+.num.off{border-bottom-color:transparent}
+.num.off input,.num.off .pre,.num.off .suf{color:var(--text-disabled);-webkit-text-fill-color:var(--text-disabled);cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.chip{font:inherit;font-size:.8125rem;height:1.75rem;padding:0 .75rem;border:1px solid var(--border-strong);background:transparent;color:var(--text);border-radius:1rem;cursor:pointer}
+.chip:hover{background:var(--layer-hover)}
+.chip[aria-pressed="true"]{background:var(--inverse-bg);color:var(--inverse-text);border-color:var(--inverse-bg)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:1rem}
+.tile{appearance:none;text-align:left;font:inherit;color:var(--text);background:var(--layer);border:1px solid transparent;padding:1rem 2.75rem 1.125rem 1rem;min-height:5.5rem;cursor:pointer;display:grid;gap:.35rem;align-content:start;position:relative;transition:background .12s,border-color .12s}
+.tile:hover{background:var(--layer-hover)}
+.tile:hover small{color:var(--text-2)}
+.tile b{font-weight:500;font-size:1rem;line-height:1.375}
+.tile small{color:var(--text-2);font-size:.875rem;line-height:1.43}
+.tile .ck{position:absolute;top:1rem;right:1rem;width:1.125rem;height:1.125rem;border:1px solid var(--border-strong);background:transparent}
+.tile[aria-pressed="true"]{border-color:var(--interactive);background:var(--blue-tint)}
+.tile[aria-pressed="true"] .ck{background:var(--interactive);border-color:var(--interactive)}
+.tile[aria-pressed="true"] .ck::after{content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.sub{border-left:2px solid var(--border-subtle);padding-left:1rem;display:grid;gap:.75rem}
+.sub .lab2{font-size:.875rem;color:var(--text-2)}
+.sub .hint{font-size:.75rem;color:var(--text-3);font-family:var(--mono)}
+.seg{display:flex;flex-wrap:wrap;gap:1px;background:var(--border-subtle);border:1px solid var(--border-subtle);width:fit-content;max-width:100%}
+.seg button{font:inherit;font-size:.875rem;background:var(--bg);color:var(--text);border:0;padding:.5rem 1rem;min-height:2.5rem;cursor:pointer;flex:1 1 auto;min-width:6rem}
+@media (max-width:640px){.seg button{min-width:0}}
+.seg button:hover{background:var(--layer-hover)}
+.seg button[aria-pressed="true"]{background:var(--inverse-bg);color:var(--inverse-text)}
+.row2{display:grid;grid-template-columns:1fr;gap:.75rem}
+.subq{display:grid;gap:.5rem}
+.subq .lab2{font-size:.875rem;font-weight:500}
+.check{display:flex;align-items:center;gap:.625rem;font-size:.875rem;cursor:pointer;width:fit-content;min-height:1.75rem}
+.check input{width:1.125rem;height:1.125rem;margin:0;accent-color:var(--interactive)}
+.notpriced{font-size:.8125rem;color:var(--text-2);line-height:1.45;max-width:60ch}
+
+/* results */
+.res{display:grid;gap:1.5rem;align-content:start}
+.panel{background:var(--layer);padding:1.5rem 1.5rem 1.75rem;display:grid;gap:1.25rem}
+.panel .eyebrow{display:flex;justify-content:space-between;align-items:center;gap:1rem;font-size:.75rem;color:var(--text-3);flex-wrap:wrap}
+.panel .eyebrow span:last-child{font-family:var(--mono)}
+.headline{font-size:1.25rem;line-height:1.35;font-weight:400;max-width:40ch}
+.headline b{font-weight:600}
+.hero-num{font-size:clamp(2.25rem,4vw,3rem);line-height:1.05;font-weight:300;letter-spacing:-.01em}
+.hero-num2{font-size:clamp(1.5rem,2.6vw,2rem);margin-top:.15rem}
+.hero-sub{font-size:.875rem;color:var(--text-2);margin-top:.5rem;max-width:52ch}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border-subtle);border:1px solid var(--border-subtle)}
+.kpi{background:var(--layer-2);padding:1rem 1rem 1.125rem;display:grid;gap:.25rem;min-height:6rem;align-content:start}
+.kpi .l{font-size:.8125rem;color:var(--text-2)}
+.kpi .v{font-size:1.5rem;font-weight:400;line-height:1.35}
+.kpi .s{font-size:.75rem;color:var(--text-3)}
+.kpi .sw{display:inline-block;width:.6rem;height:.6rem;margin-right:.35rem;vertical-align:-.02em}
+.state{display:flex;gap:.5rem;align-items:flex-start;font-size:.875rem;line-height:1.43;color:var(--text-2)}
+.state svg{flex:none;margin-top:.1rem}
+.empty{font-size:.875rem;color:var(--text-3);max-width:44ch}
+
+/* bars */
+.bars{display:grid;gap:.75rem}
+.bar{display:grid;gap:.35rem}
+.bar .t{display:flex;justify-content:space-between;align-items:baseline;font-size:.8125rem;gap:.5rem;flex-wrap:wrap}
+.bar .t b{font-weight:500}
+.bar .t span{font-family:var(--mono);font-size:.75rem;color:var(--text-2)}
+.track{position:relative;height:1.25rem;background:transparent}
+.track .seg-b{position:absolute;top:0;height:100%;cursor:default}
+.track .rng{position:absolute;top:0;height:100%;border-left:1px solid var(--text-3);border-right:1px solid var(--text-3);background:repeating-linear-gradient(135deg,transparent 0 3px,var(--text-3) 3px 4px);opacity:.45;pointer-events:none}
+.axis{position:relative;height:1rem;font-family:var(--mono);font-size:.6875rem;color:var(--text-3)}
+.axis span{position:absolute;transform:translateX(-50%)}
+.axis span:first-child{transform:none}
+.axis span:last-child{transform:translateX(-100%)}
+.legend{display:flex;flex-wrap:wrap;gap:.35rem .9rem;font-size:.75rem;color:var(--text-2)}
+.legend i{display:inline-block;width:.6rem;height:.6rem;margin-right:.35rem;vertical-align:-.02em}
+.legend i.rng{background:repeating-linear-gradient(135deg,transparent 0 2px,var(--text-3) 2px 3px);border:1px solid var(--text-3)}
+.tip{position:fixed;z-index:10;pointer-events:none;background:var(--inverse-bg);color:var(--inverse-text);font-size:.75rem;padding:.4rem .6rem;max-width:18rem;display:none;line-height:1.35}
+.tip b{display:block;font-size:.875rem;font-weight:600}
+
+/* table twin */
+details.twin{font-size:.8125rem}
+details.twin summary{cursor:pointer;color:var(--link);list-style:none;display:inline-flex;align-items:center;gap:.35rem;min-height:1.5rem;padding:.25rem 0}
+details.twin summary::-webkit-details-marker{display:none}
+table{border-collapse:collapse;width:100%;font-size:.8125rem;margin-top:.5rem}
+th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--border-subtle);vertical-align:top}
+th{font-weight:500;color:var(--text-2);font-size:.75rem}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl-wrap{overflow-x:auto}
+
+/* insights: Carbon accordion */
+.ins{display:grid;gap:.5rem}
+.ins h3{font-size:1rem;font-weight:500}
+.ins-head{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.ins-head .btn.ghost{height:2rem;padding:0 .5rem;font-size:.8125rem}
+#cards{border-top:1px solid var(--border-subtle)}
+#cards details{border-bottom:1px solid var(--border-subtle)}
+#cards summary{list-style:none;display:flex;align-items:center;gap:.75rem;min-height:3rem;padding:.75rem 1rem .75rem .75rem;cursor:pointer;font-size:.875rem;font-weight:500;line-height:1.29;color:var(--text)}
+#cards summary::-webkit-details-marker{display:none}
+#cards summary:hover{background:var(--layer-hover)}
+#cards summary .chev{margin-left:auto;flex:none;transition:transform .11s;color:var(--text)}
+#cards details[open] summary .chev{transform:rotate(180deg)}
+#cards .dot{width:.5rem;height:.5rem;flex:none;background:var(--border-strong)}
+#cards details.info .dot{background:var(--info)} #cards details.warn .dot{background:var(--warning)} #cards details.good .dot{background:var(--success)}
+#cards .ai-body{padding:0 1rem 1.5rem 2rem;font-size:.8125rem;display:grid;gap:.35rem;max-width:60ch}
+#cards .ai-body p{margin:0;color:var(--text-2)}
+#cards .src{font-size:.75rem;color:var(--text-3)}
+#cards .ask{font-size:.75rem;color:var(--text-2)}
+#cards .ask b{font-size:.75rem;font-weight:500}
+.card{background:var(--layer-2);border-left:3px solid var(--border-strong);padding:.75rem .875rem;display:grid;gap:.25rem;font-size:.8125rem}
+.card.info{border-left-color:var(--info)} .card.warn{border-left-color:var(--warning)} .card.good{border-left-color:var(--success)}
+.card b{font-weight:600;font-size:.875rem}
+.card p{margin:0;color:var(--text-2)}
+.card .src{font-size:.75rem;color:var(--text-3)}
+.card .ask{font-size:.75rem;color:var(--text-2)}
+.card .ask b{font-size:.75rem;font-weight:500}
+
+/* 3-year */
+.toggle{display:flex;align-items:center;gap:.75rem;cursor:pointer;width:fit-content;font-size:.8125rem}
+.toggle input{position:absolute;opacity:0;width:0;height:0}
+.toggle .tk{width:3rem;height:1.5rem;border-radius:.75rem;background:var(--border-strong);position:relative;transition:background .12s;flex:none}
+.toggle .tk::after{content:"";position:absolute;top:.1875rem;left:.1875rem;width:1.125rem;height:1.125rem;border-radius:50%;background:#fff;transition:transform .12s}
+.toggle input:checked+.tk{background:var(--success)}
+.toggle input:checked+.tk::after{transform:translateX(1.5rem)}
+.toggle input:focus-visible+.tk{outline:2px solid var(--focus);outline-offset:2px}
+.assume{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem .5rem}
+@media (max-width:480px){.assume{grid-template-columns:1fr}}
+.assume .ai{display:grid;gap:.25rem;font-size:.75rem;color:var(--text-2)}
+.assume .num{max-width:none;height:2rem;background:var(--layer-2)}
+.assume .ev{font-family:var(--mono);font-size:.6875rem;color:var(--text-3)}
+.ylabels{padding-left:3rem}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:end;height:9rem;border-bottom:1px solid var(--chart-grid);padding:0 .5rem;position:relative;margin-top:2.5rem}
+.cols .yr{display:flex;gap:2px;align-items:flex-end;justify-content:center;height:100%;position:relative}
+.cols .yr .v2{position:absolute;bottom:calc(100% + .25rem);left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:.6875rem;color:var(--text-2);white-space:nowrap}
+.cols .c{width:1.25rem;max-width:24px;position:relative;cursor:default}
+.cols .yl{position:absolute;top:100%;left:0;right:0;text-align:center;font-size:.75rem;color:var(--text-3);padding-top:.35rem}
+.grid-l{position:absolute;left:0;right:0;border-top:1px solid var(--chart-grid);pointer-events:none}
+.grid-l span{position:absolute;right:100%;transform:translateY(-50%);font-family:var(--mono);font-size:.6875rem;color:var(--text-3);padding-right:.35rem}
+
+/* actions */
+.actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.btn{font:inherit;font-size:.875rem;height:3rem;padding:0 1rem;min-width:10rem;display:inline-flex;align-items:center;justify-content:space-between;gap:1.5rem;border:1px solid transparent;cursor:pointer;text-decoration:none;text-align:left}
+.btn.primary{background:var(--interactive);color:#fff}
+.btn.primary:hover{background:var(--interactive-hover);color:#fff}
+.btn.tertiary{background:transparent;color:var(--link);border-color:var(--interactive)}
+.btn.tertiary:hover{background:var(--interactive);color:#fff}
+.btn.ghost{background:transparent;color:var(--link);min-width:0;gap:.5rem}
+.btn.ghost:hover{background:var(--layer-hover);color:var(--link-hover)}
+.btn svg{flex:none}
+.toast{font-size:.75rem;color:var(--text-3)}
+
+/* methodology */
+.method{margin:3rem 0 2rem;border-top:1px solid var(--text);padding-top:1.5rem;display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:2rem}
+@media (max-width:900px){.method{grid-template-columns:1fr}}
+.method h2{font-size:1.25rem;margin-bottom:.5rem}
+.method p,.method li{color:var(--text-2);font-size:.875rem}
+.method ol{padding-left:1.25rem;margin:.5rem 0;display:grid;gap:.5rem}
+.method .foot{font-size:.75rem;color:var(--text-3);margin-top:1rem;line-height:1.5}
+.evid{display:grid;gap:.5rem;margin-top:.5rem}
+.evid div{border-top:1px solid var(--border-subtle);padding:.5rem 0;font-size:.8125rem}
+.evid b{display:block;font-weight:500}
+.evid small{color:var(--text-3)}
+.evid .scope{border-top:0;color:var(--text-3);font-size:.75rem}
+details.acc{border-top:1px solid var(--border-subtle)}
+details.acc summary{cursor:pointer;padding:.75rem 0;font-weight:500;list-style:none;display:flex;justify-content:space-between;font-size:.875rem}
+details.acc summary::-webkit-details-marker{display:none}
+details.acc summary::after{content:"+";font-family:var(--mono);color:var(--text-3)}
+details.acc[open] summary::after{content:"–"}
+.bottom{border-top:1px solid var(--border-subtle);padding:1.25rem 0 2.5rem;font-size:.75rem;color:var(--text-3);display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+
+/* print */
+.print-only{display:none}
+@media print{
+  :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{color-scheme:light;--bg:#fff;--layer:#fff;--layer-2:#fff;--field:#f4f4f4;--layer-hover:#e8e8e8;--text:#161616;--text-2:#525252;--text-3:#6f6f6f;--text-placeholder:#a8a8a8;--border-subtle:#e0e0e0;--border-strong:#8d8d8d;--chart-grid:#e0e0e0;--link:#0043ce;--link-hover:#0043ce;--info:#0043ce;--success:#24a148;--warning:#f1c21b;--warning-tint:#fcf4d6;--warning-text:#8e6a00;--inverse-bg:#393939;--inverse-text:#fff;--s1:#8a3ffc;--s2:#0072c3;--s3:#009d9a;--s4:#d02670;--s5:#eb6200;--s6:#24a148;--s-dd:#525252;--s-ibm:#0f62fe;--s-ibm-logs:#002d9c;--s-turbo:#78a9ff}
+  body{padding-inline:0;font-size:11pt}
+  .top .meta,.hero .how,.questions,.actions,.toggle,.hero p,.qhead .tag,.notif .x,details.twin summary,#expandAll{display:none!important}
+  .main{grid-template-columns:1fr;border-top:0;padding-top:0}
+  .res{position:static}
+  .panel{padding:0;background:#fff}
+  .notif{margin:.5rem 0;break-inside:avoid}
+  .print-only{display:block}
+  .print-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem 1rem;margin:1rem 0;font-size:10pt}
+  .print-inputs div{border-top:1px solid #e0e0e0;padding-top:.25rem}
+  .print-inputs small{display:block;color:#6f6f6f}
+  .hero{padding:1rem 0 .5rem}
+  .hero h1{font-size:22pt}
+  .method{margin-top:1.5rem;grid-template-columns:1fr}
+  details.twin,details.acc{display:block}
+  a{color:#161616;text-decoration:none}
+  .card,.kpi,.bar,.cols{break-inside:avoid}
+  .seg-b,.rng,.legend i,.kpi .sw,.cols .c,.card,.kpi,.tile,.chip,.notif{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* v2 additions */
+.gaps{border-top:1px solid var(--border-subtle);padding-top:1rem;display:grid;gap:.5rem}
+.gaps h4{margin:0;font-size:1rem;font-weight:500}
+.gaps ul{margin:0;padding-left:1.1rem;display:grid;gap:.3rem;font-size:.875rem;line-height:1.43;color:var(--text-2)}
+.gaps .ibm{font-size:.875rem;line-height:1.43;color:var(--text);border-left:3px solid var(--interactive);padding:.6rem .875rem;background:var(--layer-2);margin-top:.25rem}
+.ins-sub{font-size:.875rem;color:var(--text-2);margin-top:-.25rem}
+#comp button{flex:1 1 30%}
+.gaps-sub{font-size:.8125rem;color:var(--text-2)}
+.gap-t{width:100%;border-collapse:collapse;font-size:.875rem}
+.gap-t th{text-align:left;font-weight:500;font-size:.8125rem;color:var(--text);padding:1rem 0 .4rem;border-bottom:1px solid var(--border-strong)}
+.gap-t th.r{text-align:right}
+.gap-t tbody:first-of-type th{padding-top:.25rem}
+.gap-t td{padding:.55rem 0;border-bottom:1px solid var(--border-subtle);vertical-align:top;line-height:1.43}
+.gap-t td b{font-weight:500;display:block}
+.gap-t td small{display:block;color:var(--text-2);font-size:.8125rem;margin-top:.1rem}
+.gap-t td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding-left:1.25rem;min-width:9rem}
+.gap-t td.r small{white-space:normal}
+.gaps .more{font-size:.8125rem;color:var(--text-2)}
+.gaps .ibm b{display:block;font-weight:500;margin-bottom:.2rem}
+.gap-more{border-top:1px solid var(--border-strong)}
+.gap-more summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;font-size:.875rem;font-weight:500;padding:.8rem 0;color:var(--text)}
+.gap-more summary::-webkit-details-marker{display:none}
+.gap-more summary:hover{color:var(--interactive)}
+.gap-more .chev{flex:none;transition:transform .15s}
+.gap-more[open] summary .chev{transform:rotate(180deg)}
+.gap-more .gap-t{margin-top:-.25rem}
+@media (max-width:640px){.gap-t td.r{min-width:0;white-space:normal;padding-left:.75rem;max-width:7.5rem} .gap-t td{font-size:.8125rem}}
+.opt{border-top:3px solid var(--interactive)}
+.opt .eyebrow span:first-child{color:var(--text)}
+.opt .eyebrow span:last-child{font-family:var(--sans)}
+.opt .hero-num{font-size:clamp(1.75rem,3vw,2.5rem)}
+.opt p{margin:0;font-size:.875rem;color:var(--text-2);line-height:1.5}
+.opt .muted{font-size:.9375rem;color:var(--text-2);line-height:1.5}
+.opt .btn{width:fit-content}
+@media print{.print-only{display:block} .opt,.ins,.gaps{break-inside:avoid}}
+.hero-label{font-size:1rem;color:var(--text-2);margin-bottom:.35rem}
+.gap-t td small{display:inline;margin:0 0 0 .35rem}
+.gap-t td.r{white-space:normal;min-width:11rem;max-width:18rem}
+.gap-t tr[data-tip]{cursor:help}
+.opt h3{font-size:1.25rem;font-weight:400;margin:0}
+.years-net{border-top:1px solid var(--border-subtle);padding-top:.75rem;font-size:.9375rem;line-height:1.5}
+.years-net b{font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="ibm">IBM</span><span class="name">Observability cost calculator</span></div>
+  </header>
+
+  <section class="hero">
+    <h1>Are you paying too much for observability?</h1>
+    <p>Seven quick questions at public list prices. See what Datadog costs you today, what the same coverage costs on IBM Concert, and where to look first.</p>
+  </section>
+
+  <main class="main">
+    <section class="questions" aria-label="Your answers">
+      <div class="qhead">
+        <h2>Seven questions</h2>
+        <span class="tag blue" id="exampleTag">Example answers shown. Replace them with yours.</span>
+      </div>
+
+      <div class="q" id="q1">
+        <div class="n">01</div>
+        <div>
+          <label class="lab" for="spend">What do you spend on observability tools per year?</label>
+          <div class="help">All tools combined, licenses and data charges. A rough number is fine; leave it blank to see list prices alone.</div>
+          <div class="ctl">
+            <div class="num">
+              <span class="pre">$</span>
+              <input id="spend" type="number" inputmode="numeric" min="0" step="10000" value="600000" placeholder="e.g. 600,000">
+              <span class="suf">per year</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q" id="q2">
+        <div class="n">02</div>
+        <div>
+          <div class="lab" id="compLab">Which platform carries most of that spend?</div>
+          <div class="help">The comparison uses this platform’s public list prices.</div>
+          <div class="ctl">
+            <div class="seg" role="group" aria-labelledby="compLab" id="comp">
+              <button type="button" data-v="datadog">Datadog</button>
+            </div>
+            <label class="check"><input type="checkbox" id="multi"> I use more than one platform</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q" id="q3">
+        <div class="n">03</div>
+        <div>
+          <label class="lab" for="hosts">How many hosts do you monitor?</label>
+          <div class="help">VMs, bare-metal servers, cloud instances and Kubernetes worker nodes. A rough count is fine. Minimum 10.</div>
+          <div class="ctl">
+            <div class="num">
+              <button class="step" type="button" data-step="-50" aria-label="Fewer hosts">−</button>
+              <input id="hosts" type="number" inputmode="numeric" min="10" max="100000" step="10" value="500" aria-describedby="hostsHelp">
+              <span class="suf" id="hostsHelp">hosts</span>
+              <button class="step" type="button" data-step="50" aria-label="More hosts">+</button>
+            </div>
+            <div class="chips" id="hostChips" role="group" aria-label="Quick picks">
+              <button class="chip" type="button" data-hosts="100">100</button>
+              <button class="chip" type="button" data-hosts="250">250</button>
+              <button class="chip" type="button" data-hosts="500">500</button>
+              <button class="chip" type="button" data-hosts="1000">1,000</button>
+              <button class="chip" type="button" data-hosts="2500">2,500</button>
+              <button class="chip" type="button" data-hosts="5000">5,000</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q" id="q4">
+        <div class="n">04</div>
+        <div>
+          <div class="lab" id="capsLab">Which capabilities do you pay for today?</div>
+          <div class="help">Pick everything you use, even if it comes from different tools. Most platforms price each one separately; IBM Concert includes every capability of the tier in one per-host price, with log volume priced per GB on both sides.</div>
+          <div class="ctl">
+            <div class="tiles" role="group" aria-labelledby="capsLab" id="caps"></div>
+            <div class="sub" id="logSub" hidden>
+              <div class="lab2" id="logVolLab">Roughly how much log data per host per month?</div>
+              <div class="seg" role="group" aria-labelledby="logVolLab" id="logVol">
+                <button type="button" data-v="light">Light · 10 GB per host</button>
+                <button type="button" data-v="typical">Typical · 30 GB per host</button>
+                <button type="button" data-v="heavy">Heavy · 100 GB per host</button>
+              </div>
+              <div class="hint" id="logHint"></div>
+            </div>
+            <div class="notpriced">Not priced on either side: incident paging and on-call seats, network monitoring, security, serverless functions, LLM and GPU observability. See the assumptions below the result.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q" id="q5">
+        <div class="n">05</div>
+        <div>
+          <div class="lab" id="toolsLab">How many tools make up your observability stack?</div>
+          <div class="help">Monitoring, logging, tracing, synthetics, incident tooling, cost tooling. Count paid and open-source tools you operate.</div>
+          <div class="ctl">
+            <div class="seg" role="group" aria-labelledby="toolsLab" id="tools">
+              <button type="button" data-v="1">1</button>
+              <button type="button" data-v="2">2 – 3</button>
+              <button type="button" data-v="3">4 – 6</button>
+              <button type="button" data-v="4">7 or more</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q" id="q6">
+        <div class="n">06</div>
+        <div>
+          <div class="lab">How do incidents usually go?</div>
+          <div class="help">Four quick taps. These do not change the price comparison; they shape the "where to look" findings.</div>
+          <div class="ctl row2">
+            <div class="subq">
+              <div class="lab2" id="mttrLab">Time to find and fix a typical incident</div>
+              <div class="seg" role="group" aria-labelledby="mttrLab" id="mttr">
+                <button type="button" data-v="1">Under 1 hour</button>
+                <button type="button" data-v="2">1 – 4 hours</button>
+                <button type="button" data-v="3">4 – 8 hours</button>
+                <button type="button" data-v="4">More than 8 hours</button>
+              </div>
+            </div>
+            <div class="subq">
+              <div class="lab2" id="catchLab">Do you catch issues before users do?</div>
+              <div class="seg" role="group" aria-labelledby="catchLab" id="catch">
+                <button type="button" data-v="1">Usually</button>
+                <button type="button" data-v="2">Sometimes</button>
+                <button type="button" data-v="3">Rarely</button>
+              </div>
+            </div>
+            <div class="subq">
+              <div class="lab2" id="ctxLab">Can teams see application and network context together?</div>
+              <div class="seg" role="group" aria-labelledby="ctxLab" id="ctx">
+                <button type="button" data-v="1">Yes, in one place</button>
+                <button type="button" data-v="2">Partly</button>
+                <button type="button" data-v="3">No, separate tools</button>
+              </div>
+            </div>
+            <div class="subq">
+              <div class="lab2" id="justLab">Do the outcomes justify what you spend on tooling?</div>
+              <div class="seg" role="group" aria-labelledby="justLab" id="just">
+                <button type="button" data-v="1">Yes</button>
+                <button type="button" data-v="2">Not sure</button>
+                <button type="button" data-v="3">No</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q" id="q7">
+        <div class="n">07</div>
+        <div>
+          <label class="lab" for="cloud">What is your monthly public cloud bill?</label>
+          <div class="help">Optional. AWS, Azure and Google Cloud combined. It does not change the tool comparison; it sizes the additional cloud saving shown under the findings.</div>
+          <div class="ctl">
+            <div class="num" id="cloudWrap">
+              <span class="pre">$</span>
+              <input id="cloud" type="number" inputmode="numeric" min="0" step="10000" value="250000" placeholder="e.g. 250,000">
+              <span class="suf">per month</span>
+            </div>
+            <label class="check"><input type="checkbox" id="onprem"> Mostly on-premises, skip the cloud part</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="res" aria-label="Your result">
+      <div class="sr" id="live" role="status" aria-live="polite"></div>
+      <div class="panel">
+        <div class="eyebrow"><span id="resTitle">What the same coverage costs, at public list prices</span><span id="progress">7 of 7 answered</span></div>
+        <div class="print-only">
+          <div class="print-inputs" id="printInputs"></div>
+        </div>
+        <div>
+          <div class="hero-label" id="heroLabel"></div>
+          <div class="hero-num" id="heroNum">–</div>
+          <div class="hero-sub" id="heroSub"></div>
+        </div>
+        <div class="headline" id="headline"></div>
+        <div class="state" id="stateNote" hidden></div>
+        <div class="kpis" id="kpis"></div>
+        <div class="bars" id="bars"></div>
+        <div class="legend" id="legend"></div>
+        <details class="twin">
+          <summary>Show the numbers as a table</summary>
+          <div class="tbl-wrap" id="tableTwin"></div>
+        </details>
+        <div class="gaps" id="gaps"></div>
+        <div class="print-only">
+          <h3 style="font-size:1rem;font-weight:500;margin:.5rem 0 0">All platforms at a glance, observability only</h3>
+          <div class="tbl-wrap" id="glance"></div>
+        </div>
+      </div>
+
+      <div class="panel ins" id="insights">
+        <div class="ins-head"><h3>Where to look first</h3><button class="btn ghost" type="button" id="expandAll" aria-expanded="false">Expand all</button></div>
+        <div class="ins-sub">Advice for your next observability renewal, from your answers. Each item ends with a question worth asking.</div>
+        <div id="cards"></div>
+      </div>
+
+      <section class="panel opt" id="optPanel" aria-label="Beyond the tool bill: cloud savings with IBM Concert Optimize"></section>
+      <div class="panel">
+        <div class="actions">
+          <a class="btn primary" id="cta" href="https://www.ibm.com/products/concert" target="_blank" rel="noopener">Talk to an IBM expert<span class="sr"> (opens in a new tab)</span> <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9 2v1.5h2.4L6 8.9 7.1 10l5.4-5.4V7H14V2H9zM12 12.5H3.5V4H7V2.5H2v11.5h11.5V9H12v3.5z"/></svg></a>
+          <button class="btn tertiary" type="button" id="copy">Copy summary <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10 1H3v10h1.5V2.5H10V1zm3 3H6v11h7V4zm-1.5 9.5h-4v-8h4v8z"/></svg></button>
+          <button class="btn tertiary" type="button" id="pdf">Print or save as PDF <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8.75 1h-1.5v7.4L5 6.2 3.9 7.3 8 11.4l4.1-4.1L11 6.2 8.75 8.4V1zM2 13.5h12V15H2v-1.5z"/></svg></button>
+          <button class="btn ghost" type="button" id="share">Copy share link <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.3 11.3 4.9 9.9a3 3 0 0 1 0-4.2l2-2a3 3 0 0 1 4.2 0l.4.4-1.1 1.1-.4-.4a1.5 1.5 0 0 0-2.1 0l-2 2a1.5 1.5 0 0 0 0 2.1l1.4 1.4-1 1zM9.7 4.7l1.4 1.4a3 3 0 0 1 0 4.2l-2 2a3 3 0 0 1-4.2 0l-.4-.4 1.1-1.1.4.4a1.5 1.5 0 0 0 2.1 0l2-2a1.5 1.5 0 0 0 0-2.1L8.7 5.7l1-1z"/></svg></button>
+          <button class="btn ghost" type="button" id="reset">Reset</button>
+          <span class="toast" id="toast" role="status"></span>
+        </div>
+      </div>
+
+      <section class="panel years" id="yearsPanel" aria-label="Illustrative three-year view">
+        <label class="toggle"><input type="checkbox" id="yearsOn" checked><span class="tk" aria-hidden="true"></span><span>Illustrative three-year view</span></label>
+        <div id="years">
+          <div class="hero-sub" style="margin:0 0 .75rem">Year one is usually discounted; the price tends to rise after that as the discount shrinks and the environment grows. Tool costs only; every assumption is editable and none is a forecast. IBM Concert is shown at list unless you enter your own discount. Switching costs are real and not in any list price: Forrester's composite Instana organization was modeled with about 40 hours of implementation per application and ongoing management of three people at 20%; enter your own estimate.</div>
+          <div class="assume">
+            <div class="ai"><label for="d1">Year-1 discount off list</label><div class="num"><input id="d1" type="number" min="0" max="80" step="5" value="20" aria-describedby="d1ev"><span class="suf">%</span></div><span class="ev" id="d1ev">evidence: low to medium</span></div>
+            <div class="ai"><label for="d2">Discount kept at renewal (years 2–3)</label><div class="num"><input id="d2" type="number" min="0" max="80" step="5" value="10" aria-describedby="d2ev"><span class="suf">%</span></div><span class="ev" id="d2ev">evidence: low</span></div>
+            <div class="ai"><label for="g">Annual growth in hosts and data</label><div class="num"><input id="g" type="number" min="0" max="100" step="5" value="20" aria-describedby="gev"><span class="suf">%</span></div><span class="ev" id="gev">evidence: medium, applied to both sides</span></div>
+            <div class="ai"><label for="di">IBM Concert discount off list, all years</label><div class="num"><input id="di" type="number" min="0" max="80" step="5" value="0" aria-describedby="diev"><span class="suf">%</span></div><span class="ev" id="diev">your quote; list price by default</span></div>
+            <div class="ai"><label for="sw">One-time switching cost, IBM year 1</label><div class="num"><span class="pre">$</span><input id="sw" type="number" min="0" step="10000" value="0" aria-describedby="swev"><span class="suf"></span></div><span class="ev" id="swev">your estimate; migration, training, parallel running</span></div>
+          </div>
+          <div class="ylabels">
+            <div class="cols" id="cols"></div>
+          </div>
+          <div class="legend" id="yearsLegend" style="margin-top:1.75rem"></div>
+          <div class="years-net" id="yearsNet" hidden></div>
+          <details class="twin" style="margin-top:.5rem">
+            <summary>Show the three-year numbers as a table</summary>
+            <div class="tbl-wrap" id="yearsTable"></div>
+          </details>
+        </div>
+      </section>
+
+    </aside>
+  </main>
+
+  <section class="method" id="method">
+    <div>
+      <h2>How the estimate works</h2>
+      <p>Every number comes from a public list price or a cited study. The model multiplies your host count by per-host list prices for the capabilities you picked, at one typical volume assumption per line, and compares that with IBM Concert priced at IBM Instana list. Discounts, contract terms and your real data volumes will move every figure.</p>
+      <p>Cloud and infrastructure savings are kept apart from the tool comparison. The three-year view is an illustration you control, not a forecast.</p>
+    </div>
+    <div>
+      <details class="acc" open>
+        <summary>Assumptions and footnotes</summary>
+        <ol id="footnotes"></ol>
+      </details>
+      <details class="acc">
+        <summary>Evidence we cite</summary>
+        <div class="evid" id="evidence"></div>
+      </details>
+      <details class="acc">
+        <summary>Price table used by the model</summary>
+        <div class="tbl-wrap" id="priceTable"></div>
+      </details>
+      <div class="foot" id="disclaimer"></div>
+    </div>
+  </section>
+
+  <footer class="bottom">
+    <span>Estimates for IBM Concert platform Observe + Optimize capabilities, powered by IBM Instana and IBM Turbonomic, priced at Instana and Turbonomic public list prices. List prices in USD as published by each vendor, checked 18 October 2026; one host is treated as one managed virtual server.</span>
+    <span>Version 3.0 · Datadog</span>
+  </footer>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+/* ---------- constants: public list prices, USD, per host (MVS) per month unless stated; verified 18 Oct 2026 ---------- */
+const P = {
+  dd: {
+    infra:   { low: 15,  high: 38 },
+    apm:     { low: 31,  high: 40, saLow: 36, saHigh: 47 },
+    logs:    { gb: { light: 10, typical: 30, heavy: 100 }, ingestPerGB: 0.10, indexPerM: 1.70, eventsPerGBm: 1, shareLow: 0.50, shareHigh: 1.00 },
+    dx:      { low: 2,   high: 8 },
+    db:      { perDbHost: 70, infraLow: 15, infraHigh: 23, shareLow: 0.05, shareHigh: 0.15 },
+    ccm:     { low: 0.005, high: 0.010 }
+  },
+  ibm: { essentials: 21.20, standard: 79.50, fairUse: { essentials: 50, standard: 325 }, ingestOverageGB: 0.212, logsPerGB: 0.351, turboLow: 15.80, turboHigh: 21.15, turbo: 18.48 }
+};
+const CAPS = [
+  { id:'infra', name:'Infrastructure & containers', sub:'Servers, VMs, cloud instances, Kubernetes', color:'--s1' },
+  { id:'apm',   name:'Application performance & tracing', sub:'APM, distributed tracing, profiling', color:'--s2' },
+  { id:'logs',  name:'Logs', sub:'Ingest, index, search, retain', color:'--s3' },
+  { id:'dx',    name:'Digital experience', sub:'Real-user and synthetic monitoring', color:'--s4' },
+  { id:'db',    name:'Database monitoring', sub:'Query performance, hosts, explain plans', color:'--s5' }
+];
+/* assumptions shared by the non-host-priced platforms */
+const A = { memLow: 16, memHigh: 32, infraGBLow: 2, infraGBHigh: 5, apmGBLow: 5, apmGBHigh: 15, hostsPerUserLow: 20, hostsPerUserHigh: 8, seriesLow: 1000, seriesHigh: 3000, containers: 10, sessionsLow: 300, sessionsHigh: 1500, runsLow: 2000, runsHigh: 5000, browserRuns: 100 };
+const COMP = {
+  datadog: { name:'Datadog', hasCcm:true, url:'https://www.datadoghq.com/pricing/', d1:20, d2:10, dEv:'evidence: low to medium', price(cap, c) {
+    const d = P.dd, hasInfra = c.includes('infra');
+    if (cap === 'infra') return { low: d.infra.low, high: d.infra.high };
+    if (cap === 'apm') return hasInfra ? { low: d.apm.low, high: d.apm.high } : { low: d.apm.saLow, high: d.apm.saHigh };
+    if (cap === 'logs') { const gb = d.logs.gb[S.logVol]; const f = sh => d.logs.ingestPerGB + sh * d.logs.eventsPerGBm * d.logs.indexPerM; return { low: gb * f(d.logs.shareLow), high: gb * f(d.logs.shareHigh) }; }
+    if (cap === 'dx') return { low: d.dx.low, high: d.dx.high };
+    if (cap === 'db') return { low: (d.db.perDbHost + (hasInfra ? 0 : d.db.infraLow)) * d.db.shareLow, high: (d.db.perDbHost + (hasInfra ? 0 : d.db.infraHigh)) * d.db.shareHigh };
+    return null; }, extra() { return []; } },
+  dynatrace: { name:'Dynatrace', hasCcm:false, url:'https://www.dynatrace.com/pricing/', d1:20, d2:10, dEv:'assumption, not researched for Dynatrace', price(cap, c) {
+    const fs = c.includes('apm');
+    if (cap === 'infra') return fs ? { low: 0, high: 0, note:'included in Full-Stack' } : { low: 0.04 * 730, high: 0.04 * 730 + A.containers * 0.002 * 730 };
+    if (cap === 'apm') return { low: 0.01 * A.memLow * 730, high: 0.01 * A.memHigh * 730 };
+    if (cap === 'logs') { const gb = P.dd.logs.gb[S.logVol]; return { low: gb * (0.20 + 0.0007 * 15 + 0.0035 * 2), high: gb * (0.20 + 0.02 * 15) }; }
+    if (cap === 'dx') return { low: A.sessionsLow * 0.00225 + A.runsLow * 0.001, high: A.sessionsHigh * 0.00225 + A.runsHigh * 0.001 + A.browserRuns * 5 * 0.0045 };
+    if (cap === 'db') return { low: 0.11 * 730 * P.dd.db.shareLow, high: 0.11 * 730 * P.dd.db.shareHigh };
+    return null; }, extra() { return []; } },
+  newrelic: { name:'New Relic', hasCcm:false, url:'https://newrelic.com/pricing', d1:20, d2:10, dEv:'assumption, not researched for New Relic', price(cap) {
+    const gb = P.dd.logs.gb[S.logVol];
+    if (cap === 'infra') return { low: A.infraGBLow * 0.40, high: A.infraGBHigh * 0.60 };
+    if (cap === 'apm') return { low: A.apmGBLow * 0.40, high: A.apmGBHigh * 0.60 };
+    if (cap === 'logs') return { low: gb * 0.40, high: gb * 0.60 };
+    if (cap === 'dx') { const h = Math.max(S.hosts, 1), inc = 1000000; return { low: Math.max(0, A.runsLow * h - inc) * 0.005 / h, high: Math.max(0, (A.runsHigh + A.browserRuns) * h - inc) * 0.005 / h, note:'checks beyond 1M included' }; }
+    if (cap === 'db') return { low: 0, high: 0, note:'included in ingest' };
+    return null; }, extra(c) { return c.length ? [{ id:'users', name:'Full-platform users (Pro)', color:'--s-dd', phLow: 349 / A.hostsPerUserLow, phHigh: 349 / A.hostsPerUserHigh }] : []; } },
+  grafana: { name:'Grafana Cloud', hasCcm:false, url:'https://grafana.com/pricing/', d1:0, d2:0, dEv:'published usage rates; discounts not modeled', price(cap) {
+    const gb = P.dd.logs.gb[S.logVol];
+    if (cap === 'infra') return { low: A.seriesLow / 1000 * 6.50, high: A.seriesHigh / 1000 * 6.50 + 7.20 + A.containers * 0.50 };
+    if (cap === 'apm') return { low: 18 + A.apmGBLow * 0.45, high: 18 + A.apmGBHigh * 0.55 };
+    if (cap === 'logs') return { low: gb * 0.45, high: gb * 0.55 };
+    if (cap === 'dx') return { low: A.sessionsLow / 1000 * 0.75 + A.runsLow / 10000 * 5, high: A.sessionsHigh / 1000 * 0.75 + A.runsHigh / 10000 * 5 + A.browserRuns / 10000 * 50 };
+    if (cap === 'db') return { low: 51 * P.dd.db.shareLow, high: 51 * P.dd.db.shareHigh };
+    return null; }, extra(c) { return c.length ? [{ id:'users', name:'Active Grafana users', color:'--s-dd', phLow: 8 / A.hostsPerUserLow, phHigh: 8 / A.hostsPerUserHigh }] : []; } },
+  splunk: { name:'Splunk Observability', hasCcm:false, url:'https://www.splunk.com/en_us/products/pricing/observability.html', d1:20, d2:10, dEv:'assumption, not researched for Splunk', price(cap, c) {
+    if (cap === 'infra') return c.includes('apm') || c.includes('dx') ? { low: 0, high: 0, note:'included in tier' } : { low: 15, high: 15 };
+    if (cap === 'apm') return c.includes('dx') ? { low: 0, high: 0, note:'included in End-to-End' } : { low: 60, high: 60 };
+    if (cap === 'dx') return { low: 75, high: 75, note:'End-to-End tier, replaces App & Infra' };
+    if (cap === 'logs') return { unpriced:'needs Splunk Cloud Platform, not publicly priced' };
+    if (cap === 'db') return { unpriced:'optional add-on, contact Splunk' };
+    return null; }, extra() { return []; } }
+};
+
+/* what each platform's list price does not include: items read from the vendor's own price list; cap = which selected capability it attaches to ('all' = always shown) */
+const GAPS = {
+ "datadog": {
+  "checked": "23 October 2026",
+  "src": "https://www.datadoghq.com/pricing/list/",
+  "ontop": [
+   {
+    "cap": "infra",
+    "item": "Hosts without an annual commitment",
+    "price": "$18 / $27",
+    "unit": "per host per month, Pro / Enterprise",
+    "when": "Month-to-month or on-demand hosts pay these rates instead of the $15 / $23 used here."
+   },
+   {
+    "cap": "infra",
+    "item": "Containers beyond the allowance",
+    "price": "$0.002",
+    "unit": "per container per hour, or $1 per month prepaid",
+    "when": "Pro includes 5 containers per host and Enterprise 10, pooled across the account; Agent containers are excluded."
+   },
+   {
+    "cap": "infra",
+    "item": "Custom metrics beyond the allowance",
+    "price": "$5",
+    "unit": "per 100 metrics per month",
+    "when": "Pro includes 100 per host and Enterprise 200, pooled; every unique metric and tag combination counts."
+   },
+   {
+    "cap": "infra",
+    "item": "Custom events beyond the allowance",
+    "price": "$2",
+    "unit": "per 100,000 events per month",
+    "when": "Pro includes 500 per host and Enterprise 1,000; $3 on-demand."
+   },
+   {
+    "cap": "apm",
+    "item": "APM hosts without an annual commitment or without Infrastructure",
+    "price": "$36 to $48",
+    "unit": "per host per month",
+    "when": "On-demand APM $36, APM Pro $42, APM Enterprise $48; standalone without Infrastructure Monitoring $36, $41 and $47 on annual terms."
+   },
+   {
+    "cap": "apm",
+    "item": "Ingested spans beyond 150 GB per host",
+    "price": "$0.10",
+    "unit": "per GB",
+    "when": "Pooled across APM hosts; unsampled high-throughput services are the usual cause. OpenTelemetry spans from managed platforms cost $0.50 per GB."
+   },
+   {
+    "cap": "apm",
+    "item": "Indexed spans beyond 1 million per host",
+    "price": "$1.70",
+    "unit": "per million spans at 15-day retention",
+    "when": "$1.27 at 7 days and $2.50 at 30 days; on-demand use costs up to 50% more."
+   },
+   {
+    "cap": "logs",
+    "item": "Log retention other than 15 days",
+    "price": "$1.06 to $2.50",
+    "unit": "per million indexed events",
+    "when": "3-day $1.06, 7-day $1.27, 30-day $2.50 on annual terms; longer retention is priced by sales."
+   },
+   {
+    "cap": "logs",
+    "item": "Indexed logs above the monthly commitment",
+    "price": "+50%",
+    "unit": "on-demand premium",
+    "when": "Volume above the committed amount is billed at on-demand rates, $2.55 per million events at 15 days."
+   },
+   {
+    "cap": "logs",
+    "item": "Flex Logs for long retention",
+    "price": "$0.05",
+    "unit": "per million events stored per month",
+    "when": "Plus a Flex compute instance, or the $0.60 per million Starter bundle, to query them; 30-day minimum."
+   },
+   {
+    "cap": "logs",
+    "item": "Rehydration",
+    "price": "$0.10",
+    "unit": "per compressed GB scanned",
+    "when": "Pulling archived logs back during an incident also pays the indexing rate for the retention chosen."
+   },
+   {
+    "cap": "logs",
+    "item": "Forwarding logs to another destination",
+    "price": "$0.25",
+    "unit": "per GB per destination",
+    "when": "For a SIEM, BI tool or other custom destination; archives to S3, Google Cloud or Azure are free."
+   },
+   {
+    "cap": "dx",
+    "item": "Session Replay",
+    "price": "$2.50",
+    "unit": "per 1,000 sessions",
+    "when": "On top of the RUM session price; $3.60 on-demand."
+   },
+   {
+    "cap": "dx",
+    "item": "Synthetic runs without an annual commitment",
+    "price": "$6 to $7.20 / $15 to $18",
+    "unit": "per 10,000 API runs / per 1,000 browser runs",
+    "when": "Month-to-month to on-demand, versus $5 and $12 on annual terms. Mobile app tests $50 per 100 runs and Parallel Testing $79 per extra parallelization, both annual."
+   },
+   {
+    "cap": "db",
+    "item": "Database hosts without an annual commitment",
+    "price": "$84",
+    "unit": "per database host per month",
+    "when": "Versus $70 on annual terms."
+   }
+  ],
+  "separate": [
+   {
+    "item": "Incident Management",
+    "price": "$30",
+    "unit": "per seat per month",
+    "when": "$36 month-to-month, $43.20 on-demand.",
+    "cap": "all"
+   },
+   {
+    "item": "On-Call",
+    "price": "$20",
+    "unit": "per seat per month",
+    "when": "The Incident Response bundle with Incident Management is $40 per seat.",
+    "cap": "all"
+   },
+   {
+    "item": "Cloud Network Monitoring",
+    "price": "$5",
+    "unit": "per network host per month",
+    "when": "Hosts with network flow collection switched on.",
+    "cap": "all"
+   },
+   {
+    "item": "Network Device Monitoring",
+    "price": "$7",
+    "unit": "per device per month",
+    "when": "Switches, routers and firewalls polled over SNMP; NetFlow $0.60 per million records.",
+    "cap": "all"
+   },
+   {
+    "item": "Serverless Workload Monitoring",
+    "price": "$5",
+    "unit": "per active function per month",
+    "when": "Tracing add-on $10 per million traced invocations.",
+    "cap": "all"
+   },
+   {
+    "item": "Agent Observability (LLM Observability)",
+    "price": "$160",
+    "unit": "per month for the first 100,000 LLM spans",
+    "when": "Then $3.50 per 10,000 spans; 40,000 spans a month are free.",
+    "cap": "all"
+   },
+   {
+    "item": "Continuous Profiler",
+    "price": "$19",
+    "unit": "per profiled host per month",
+    "when": "Included in APM Enterprise; 4 profiled containers per host.",
+    "cap": "all"
+   },
+   {
+    "item": "Pipeline Visibility and Test Optimization",
+    "price": "$8 / $20",
+    "unit": "per active committer per month",
+    "when": "Developers with three or more commits a month in instrumented pipelines.",
+    "cap": "all"
+   },
+   {
+    "item": "Error Tracking (standalone)",
+    "price": "$25",
+    "unit": "per month for the first 50,000 errors",
+    "when": "Errors inside APM traces and RUM sessions are free.",
+    "cap": "all"
+   },
+   {
+    "item": "Observability Pipelines",
+    "price": "$0.095",
+    "unit": "per GB processed",
+    "when": "Logs routed through Datadog’s pipeline worker before they reach Datadog or another destination.",
+    "cap": "all"
+   },
+   {
+    "item": "Cloud SIEM",
+    "price": "$5",
+    "unit": "per million analyzed events",
+    "when": "Ingested logs run through detection rules.",
+    "cap": "all"
+   },
+   {
+    "item": "Cloud Security Management",
+    "price": "$10 / $25",
+    "unit": "per host per month, Pro / Enterprise",
+    "when": "Workload Protection $15; DevSecOps bundles with Infrastructure $22 / $34.",
+    "cap": "all"
+   },
+   {
+    "item": "App and API Protection",
+    "price": "$31",
+    "unit": "per host per month",
+    "when": "In-app threat detection on APM-instrumented hosts.",
+    "cap": "all"
+   },
+   {
+    "item": "Workflow Automation",
+    "price": "$10",
+    "unit": "per 100 executions per month",
+    "when": "Automated remediation or notification workflows.",
+    "cap": "all"
+   },
+   {
+    "item": "Universal Service Monitoring",
+    "price": "$9",
+    "unit": "per infrastructure host per month",
+    "when": "Agentless service discovery; free on APM hosts.",
+    "cap": "all"
+   },
+   {
+    "item": "Data Streams Monitoring",
+    "price": "$15",
+    "unit": "per client host per month",
+    "when": "Included in APM Pro and APM Enterprise.",
+    "cap": "all"
+   },
+   {
+    "item": "AI credits (Bits AI)",
+    "price": "$500",
+    "unit": "per 500-credit bundle per month",
+    "when": "Bits Chat, Investigation, Code and Agent Builder consume credits; unused credits do not roll over.",
+    "cap": "all"
+   },
+   {
+    "item": "Sensitive Data Scanner",
+    "price": "$0.30",
+    "unit": "per scanned GB",
+    "when": "PII detection or redaction on logs, traces and RUM data.",
+    "cap": "all"
+   },
+   {
+    "item": "Audit Trail",
+    "price": "2%",
+    "unit": "of Datadog spend per month",
+    "when": "3% month-to-month or on-demand.",
+    "cap": "all"
+   },
+   {
+    "item": "GPU Monitoring",
+    "price": "$20",
+    "unit": "per active GPU per month",
+    "when": "Idle GPUs are not billed.",
+    "cap": "all"
+   }
+  ]
+ },
+ "dynatrace": {
+  "checked": "23 October 2026",
+  "src": "https://www.dynatrace.com/pricing/rate-card/",
+  "ontop": [
+   {
+    "cap": "logs",
+    "item": "Log retain",
+    "price": "$0.0007",
+    "unit": "per GiB per day",
+    "when": "Every GiB kept in Grail is charged for each day of retention, on top of the $0.20 per GiB ingest."
+   },
+   {
+    "cap": "logs",
+    "item": "Log query",
+    "price": "$0.0035",
+    "unit": "per GiB scanned",
+    "when": "Every query run from notebooks, dashboards, workflows or the API is billed on the data it scans."
+   },
+   {
+    "cap": "logs",
+    "item": "Retain with included queries",
+    "price": "$0.02",
+    "unit": "per GiB per day",
+    "when": "Alternative plan for 10 to 35 days of retention. Queries up to 15 times the volume retained in that window are included each day; heavier use leads to outreach or throttling, and queries on logs outside the window bill at usage rates."
+   },
+   {
+    "cap": "infra",
+    "item": "Custom metrics beyond the allowance",
+    "price": "$0.15",
+    "unit": "per 100,000 data points",
+    "when": "Metrics from extensions, Prometheus, StatsD or OpenTelemetry beyond 1,500 points per 15 minutes per Infrastructure host (900 per Full-Stack memory GiB); unused points do not roll over."
+   },
+   {
+    "cap": "infra",
+    "item": "Metrics kept beyond 15 months",
+    "price": "$0.0007",
+    "unit": "per GiB per day",
+    "when": "Retention past the included 462 days, up to 10 years."
+   },
+   {
+    "cap": "apm",
+    "item": "Full-Stack price rises with host memory",
+    "price": "$0.01",
+    "unit": "per memory GiB-hour, 4 GiB minimum",
+    "when": "An 8 GiB host is about $58 a month and a 64 GiB host about $467; this page assumes 24 GiB."
+   },
+   {
+    "cap": "apm",
+    "item": "Trace ingest beyond the allowance",
+    "price": "$0.20",
+    "unit": "per GiB",
+    "when": "Span data above 200 KiB per minute per Full-Stack GiB, OpenTelemetry traces from hosts without OneAgent, and serverless traces."
+   },
+   {
+    "cap": "apm",
+    "item": "Trace retain and query",
+    "price": "$0.0007 / $0.0035",
+    "unit": "per GiB per day / per GiB scanned",
+    "when": "Spans kept past the included 10 days, and queries over span data from notebooks, dashboards, workflows or the API."
+   },
+   {
+    "cap": "all",
+    "item": "Events ingest, retain and query",
+    "price": "$0.20 / $0.0007 / $0.0035",
+    "unit": "per GiB / per GiB per day / per GiB scanned",
+    "when": "Business, custom, security and software-delivery events, lookup files, and Kubernetes warning events above 60 per pod-hour. Davis problems are included."
+   },
+   {
+    "cap": "dx",
+    "item": "Session Replay",
+    "price": "$0.0045",
+    "unit": "per session",
+    "when": "Replaces the $0.00225 session rate for the sessions in which replay was enabled; sampling applies."
+   },
+   {
+    "cap": "dx",
+    "item": "Session properties beyond 20 per application",
+    "price": "$0.0001",
+    "unit": "per property per session",
+    "when": "Charged for every session in which the extra property appears."
+   },
+   {
+    "cap": "dx",
+    "item": "Third-party synthetic results",
+    "price": "$0.001",
+    "unit": "per result",
+    "when": "Results pushed in from another synthetic monitoring tool."
+   },
+   {
+    "cap": "all",
+    "item": "Data egress",
+    "price": "$0.15",
+    "unit": "per GiB",
+    "when": "Forwarding logs or events to AWS S3, Google Cloud or Azure storage through OpenPipeline, counted once per destination."
+   },
+   {
+    "cap": "all",
+    "item": "Annual spend commitment",
+    "price": "not published",
+    "unit": "",
+    "when": "A platform-level commit that every capability draws down; usage beyond it is billed monthly at the same rates."
+   }
+  ],
+  "separate": [
+   {
+    "item": "Runtime Vulnerability Analytics",
+    "price": "$0.00225",
+    "unit": "per memory GiB-hour",
+    "when": "About 22.5% on top of the Full-Stack rate for every host or container it runs on.",
+    "cap": "all"
+   },
+   {
+    "item": "Runtime Application Protection",
+    "price": "$0.00225",
+    "unit": "per memory GiB-hour",
+    "when": "Requires Runtime Vulnerability Analytics, so $0.0045 per GiB-hour in practice.",
+    "cap": "all"
+   },
+   {
+    "item": "Security Posture Management",
+    "price": "$0.007",
+    "unit": "per host-hour",
+    "when": "Per Kubernetes node scanned.",
+    "cap": "all"
+   },
+   {
+    "item": "Automation workflows",
+    "price": "$0.03",
+    "unit": "per workflow-hour",
+    "when": "About $21.60 a month for each standard workflow that exists, plus $0.001 per started minute of each function call; simple and draft workflows are free.",
+    "cap": "all"
+   },
+   {
+    "item": "AI units (Dynatrace Assist, Agentic Operations)",
+    "price": "$0.10",
+    "unit": "per AI unit",
+    "when": "Two to 30 units per task, billed when triggered through workflows, MCP, the API or custom apps; use inside Dynatrace Assist is not billed for a limited time.",
+    "cap": "all"
+   },
+   {
+    "item": "Code Monitoring (Live Debugger)",
+    "price": "$0.005",
+    "unit": "per container-hour",
+    "when": "For each process monitored at code level.",
+    "cap": "all"
+   },
+   {
+    "item": "Mainframe Monitoring",
+    "price": "$0.10",
+    "unit": "per MSU-hour",
+    "when": "Measured on each monitored z/OS LPAR.",
+    "cap": "all"
+   },
+   {
+    "item": "Network device monitoring (SNMP extensions)",
+    "price": "$0.15",
+    "unit": "per 100,000 metric data points",
+    "when": "No extension fee; every data point counts against the host metric allowance and overage bills at the metrics rate.",
+    "cap": "all"
+   },
+   {
+    "item": "Cost & Carbon Optimization app",
+    "price": "not published",
+    "unit": "",
+    "when": "Ships with the platform subscription; no separate price is published.",
+    "cap": "all"
+   }
+  ]
+ },
+ "newrelic": {
+  "checked": "23 October 2026",
+  "src": "https://newrelic.com/pricing",
+  "ontop": [
+   {
+    "cap": "all",
+    "item": "Core users",
+    "price": "$49",
+    "unit": "per user per month",
+    "when": "For developers who need errors inbox, CodeStream or the full log screens. Free Basic users cannot open the APM, infrastructure or browser screens."
+   },
+   {
+    "cap": "all",
+    "item": "Full-platform users billed monthly or pay as you go",
+    "price": "$390.88 / $418.80",
+    "unit": "per user per month",
+    "when": "12% or 20% above the $349 annual-upfront price this page uses."
+   },
+   {
+    "cap": "all",
+    "item": "Enterprise edition users",
+    "price": "$549",
+    "unit": "per user per month, annual upfront",
+    "when": "Needed for FedRAMP or HIPAA eligibility (with Data Plus), priority support and a one-hour critical response time."
+   },
+   {
+    "cap": "all",
+    "item": "Extended retention",
+    "price": "$0.05",
+    "unit": "per GB ingested per month, per extra 30 days",
+    "when": "Defaults are 8 days for APM, browser and infrastructure process data and 30 days for logs; longer retention is charged on every data type."
+   },
+   {
+    "cap": "all",
+    "item": "EU data center",
+    "price": "$0.05",
+    "unit": "per GB ingested per month",
+    "when": "For accounts hosted in the European Union; Advanced Compute costs 15% more there as well."
+   },
+   {
+    "cap": "all",
+    "item": "Data Plus",
+    "price": "$0.60",
+    "unit": "per GB, versus $0.40 Original",
+    "when": "Adds up to 90 extra days of retention for most data types, custom log obfuscation and FedRAMP or HIPAA eligibility. This page uses $0.50 per GB, between the two rates."
+   },
+   {
+    "cap": "all",
+    "item": "Advanced Compute",
+    "price": "$0.60",
+    "unit": "per compute capacity unit",
+    "when": "Consumption charge behind New Relic AI, agentic AI, Pipeline Control, Live Archives, Cloud Cost Intelligence, Workflow Automation, Security RX and advanced APM maps. Free Basic users can incur it too."
+   },
+   {
+    "cap": "logs",
+    "item": "Live Archives",
+    "price": "$0.007",
+    "unit": "per GB-month stored, plus compute units for queries",
+    "when": "Keeps logs up to seven years beyond standard retention; requires Advanced Compute."
+   },
+   {
+    "cap": "dx",
+    "item": "Session replay",
+    "price": "$0.40 to $0.60",
+    "unit": "per GB ingested",
+    "when": "Billed as extra data at the account rate; New Relic’s own average is about 5.3 MB per replay."
+   },
+   {
+    "cap": "all",
+    "item": "Commitment and overage",
+    "price": "not published",
+    "unit": "",
+    "when": "A prepaid annual commitment; usage above it is invoiced monthly at order rates. Pay as you go has no commitment but costs more per user."
+   }
+  ],
+  "separate": [
+   {
+    "item": "Security RX (vulnerability management)",
+    "price": "not published",
+    "unit": "",
+    "when": "Metered in Advanced Compute units, $0.60 each, for applications and hosts.",
+    "cap": "all"
+   },
+   {
+    "item": "New Relic AI and agentic AI (Autopilot)",
+    "price": "not published",
+    "unit": "",
+    "when": "Consume Advanced Compute units at $0.60 each; needs the Advanced Compute add-on.",
+    "cap": "all"
+   },
+   {
+    "item": "Cloud Cost Intelligence",
+    "price": "not published",
+    "unit": "",
+    "when": "Metered in Advanced Compute units per GB of cloud billing data processed; needs a full-platform user. It reports; it does not change resources.",
+    "cap": "all"
+   },
+   {
+    "item": "Pipeline Control",
+    "price": "not published",
+    "unit": "",
+    "when": "Part of Advanced Compute; the gateway is metered on GB received, and cloud rules on GB dropped plus events scanned.",
+    "cap": "all"
+   },
+   {
+    "item": "Workflow Automation",
+    "price": "not published",
+    "unit": "",
+    "when": "Included only with an Advanced Compute plan.",
+    "cap": "all"
+   },
+   {
+    "item": "Transaction 360 advanced maps",
+    "price": "not published",
+    "unit": "",
+    "when": "Advanced Maps and Trace Flow views need Advanced Compute; the base view is included with distributed tracing.",
+    "cap": "all"
+   },
+   {
+    "item": "Interactive application security testing",
+    "price": "not published",
+    "unit": "",
+    "when": "Billed per test run in compute units through an add-on that is no longer generally available.",
+    "cap": "all"
+   }
+  ]
+ },
+ "grafana": {
+  "checked": "23 October 2026",
+  "src": "https://grafana.com/pricing/",
+  "ontop": [
+   {
+    "cap": "all",
+    "item": "Pro platform fee",
+    "price": "$19",
+    "unit": "per month",
+    "when": "Flat fee before any usage. It includes 10,000 series, 50 GB each of logs, traces and profiles and 3 users a month; everything above that is billed at list."
+   },
+   {
+    "cap": "all",
+    "item": "Retention beyond 30 days",
+    "price": "$0.10",
+    "unit": "per GB for each extra 30 days",
+    "when": "Logs, traces and profiles are kept 30 days on Pro; longer retention is charged per GB per 30-day step."
+   },
+   {
+    "cap": "logs",
+    "item": "Log queries beyond fair use",
+    "price": "not published",
+    "unit": "",
+    "when": "Querying more than 100 times the written log volume in a month adds a per-GB query charge."
+   },
+   {
+    "cap": "infra",
+    "item": "Metrics scraped faster than once a minute",
+    "price": "$6.50",
+    "unit": "per 1,000 series, times the scrape rate",
+    "when": "Billing switches to data points per minute; scraping every 15 seconds costs four times the series price."
+   },
+   {
+    "cap": "apm",
+    "item": "Application metrics beyond the infrastructure series",
+    "price": "$6.50",
+    "unit": "per 1,000 series",
+    "when": "Instrumented services add their own series, and the knowledge graph adds 5% to 10% more. The $0.025 host-hour fee carries no telemetry credit on plans started on or after 13 February 2026."
+   },
+   {
+    "cap": "apm",
+    "item": "Profiles (continuous profiling)",
+    "price": "$0.45",
+    "unit": "per GB",
+    "when": "$0.05 processing plus $0.40 write for profiling data beyond 50 GB a month."
+   },
+   {
+    "cap": "db",
+    "item": "Database Observability telemetry",
+    "price": "standard rates",
+    "unit": "metrics and logs",
+    "when": "Database metrics and query logs are metered separately from the $0.07 host-hour fee."
+   },
+   {
+    "cap": "all",
+    "item": "On-call and incident management (IRM)",
+    "price": "$20",
+    "unit": "per active user per month",
+    "when": "Anyone on a schedule or escalation chain, paged, or editing an incident that month; 3 users included."
+   },
+   {
+    "cap": "dx",
+    "item": "k6 performance testing",
+    "price": "$0.15",
+    "unit": "per virtual user hour",
+    "when": "Load tests beyond the 500 hours included; browser-based tests cost ten times the rate."
+   },
+   {
+    "cap": "all",
+    "item": "Enterprise data source plugins",
+    "price": "$55",
+    "unit": "per active user per month",
+    "when": "Enabling any Enterprise plugin (Splunk, Datadog, ServiceNow, Dynatrace, New Relic and others) moves every active user that month from $8 to $55."
+   },
+   {
+    "cap": "all",
+    "item": "Grafana Assistant (AI)",
+    "price": "$20",
+    "unit": "per active AI user per month",
+    "when": "Includes 40 million tokens; $2 per extra million tokens; 3 users included."
+   },
+   {
+    "cap": "all",
+    "item": "Enterprise plan",
+    "price": "$25,000",
+    "unit": "minimum commit per year",
+    "when": "Needed for contract pricing, premium support, custom retention and private or government cloud."
+   }
+  ],
+  "separate": [
+   {
+    "item": "Agent Observability (LLM and agent workloads)",
+    "price": "$1.50",
+    "unit": "per 1,000 generations",
+    "when": "Plus $2 per million evaluation tokens; 30,000 generations included on Pro.",
+    "cap": "all"
+   },
+   {
+    "item": "Premium Support",
+    "price": "not published",
+    "unit": "",
+    "when": "24/7 senior support with 30-minute P1 response; Pro includes 8x5 email support.",
+    "cap": "all"
+   },
+   {
+    "item": "Grafana Enterprise and Enterprise Metrics, Logs, Traces (self-managed)",
+    "price": "not published",
+    "unit": "",
+    "when": "Licensed through sales for self-hosted deployments.",
+    "cap": "all"
+   },
+   {
+    "item": "Cloud cost optimization",
+    "price": "no product",
+    "unit": "",
+    "when": "Grafana’s cost management covers its own usage, not your cloud bill.",
+    "cap": "all"
+   }
+  ]
+ },
+ "splunk": {
+  "checked": "23 October 2026",
+  "src": "https://www.splunk.com/en_us/products/pricing/observability.html",
+  "ontop": [
+   {
+    "cap": "infra",
+    "item": "Containers beyond the allowance",
+    "price": "not published",
+    "unit": "overage at 150% of list",
+    "when": "Standard includes 10 containers or serverless functions per host and Enterprise 20, pooled across hosts."
+   },
+   {
+    "cap": "infra",
+    "item": "Custom metrics beyond the allowance",
+    "price": "not published",
+    "unit": "per metric time series",
+    "when": "Standard includes 100 custom metric time series per host and Enterprise 200; each histogram data point counts as 8."
+   },
+   {
+    "cap": "all",
+    "item": "Usage above the subscription limit",
+    "price": "150%",
+    "unit": "of list price per extra unit",
+    "when": "Applies to hosts, containers, custom metrics, trace volume, sessions, test runs and database instances, measured on monthly average usage."
+   },
+   {
+    "cap": "all",
+    "item": "Enterprise Edition",
+    "price": "not published",
+    "unit": "uplift over Standard",
+    "when": "Doubles the per-host allowances, adds Session Replay, and keeps sub-minute metrics and synthetic results for 3 months instead of 8 days."
+   },
+   {
+    "cap": "apm",
+    "item": "APM allowances per host",
+    "price": "included",
+    "unit": "overage at 150% of list",
+    "when": "Standard: 10 containers, 3 profiled containers, 20 monitoring and 200 troubleshooting MetricSets and 10.24 MB per minute of trace volume per host; Enterprise doubles each. Database query tags draw on the MetricSet allowance."
+   },
+   {
+    "cap": "apm",
+    "item": "APM container add-on",
+    "price": "not published",
+    "unit": "",
+    "when": "Extra container capacity beyond the per-host pool; each unit adds one container, 2 monitoring and 20 troubleshooting MetricSets and 1.024 MB per minute of trace volume."
+   },
+   {
+    "cap": "dx",
+    "item": "RUM sessions",
+    "price": "not published",
+    "unit": "per 10,000 sessions per month",
+    "when": "Sessions included per host are not published; each block carries 30 GB of session volume (Enterprise 60 GB and Session Replay). New sessions are refused once the monthly limit is reached."
+   },
+   {
+    "cap": "dx",
+    "item": "Synthetic test runs",
+    "price": "not published",
+    "unit": "per 1,000 browser runs or 10,000 API runs",
+    "when": "Runs included per host are not published; browser tests are available only in the End-to-End tier."
+   },
+   {
+    "cap": "logs",
+    "item": "Log Observer Connect",
+    "price": "included",
+    "unit": "needs Splunk Cloud Platform or Splunk Enterprise",
+    "when": "Logs must already be indexed in a separately licensed Splunk platform, priced by quote. This is why logs are excluded from the Splunk total above."
+   },
+   {
+    "cap": "db",
+    "item": "Database Monitoring",
+    "price": "not published",
+    "unit": "per database instance",
+    "when": "Optional add-on; each running database instance counts, with overage at 150% of list."
+   },
+   {
+    "cap": "all",
+    "item": "Extended retention",
+    "price": "not published",
+    "unit": "",
+    "when": "Raw traces are kept 8 days (15 or 30 through your account representative); sub-minute metrics 8 days on Standard; one-minute metrics 13 months."
+   },
+   {
+    "cap": "all",
+    "item": "AI Assistant in Observability Cloud",
+    "price": "free for a limited time",
+    "unit": "",
+    "when": "No permanent inclusion statement for paid tiers."
+   }
+  ],
+  "separate": [
+   {
+    "item": "Splunk Cloud Platform or Splunk Enterprise (logs)",
+    "price": "not published",
+    "unit": "",
+    "when": "Ingest, activity or workload pricing by quote; required for any log search from Observability Cloud.",
+    "cap": "all"
+   },
+   {
+    "item": "Splunk On-Call",
+    "price": "$5",
+    "unit": "per user per month, annual, up to 10 seats",
+    "when": "Larger teams are priced by quote.",
+    "cap": "all"
+   },
+   {
+    "item": "Splunk AppDynamics",
+    "price": "$6 / $33 / $50",
+    "unit": "per vCPU or per host per month, annual",
+    "when": "Infrastructure, Premium and Enterprise editions, with add-ons for application security, RUM, browser synthetics and SAP.",
+    "cap": "all"
+   },
+   {
+    "item": "Secure Application (runtime security)",
+    "price": "not published",
+    "unit": "",
+    "when": "Add-on to APM, metered on 8 GB a day of event volume.",
+    "cap": "all"
+   },
+   {
+    "item": "Splunk IT Service Intelligence",
+    "price": "not published",
+    "unit": "",
+    "when": "Workload or ingest pricing on the Splunk platform.",
+    "cap": "all"
+   },
+   {
+    "item": "Splunk Enterprise Security",
+    "price": "not published",
+    "unit": "",
+    "when": "SIEM on the same Splunk platform deployment.",
+    "cap": "all"
+   },
+   {
+    "item": "Splunk Agent Observability",
+    "price": "$100",
+    "unit": "per month per 1.2 million spans, annual",
+    "when": "Tracing AI agent workflows; includes 500 million Luna tokens a year.",
+    "cap": "all"
+   },
+   {
+    "item": "Cloud cost optimization",
+    "price": "no product",
+    "unit": "",
+    "when": "Splunk publishes no cloud cost management product for Observability Cloud.",
+    "cap": "all"
+   }
+  ]
+ }
+};
+const IBM_SIDE = { title: 'On the IBM side', text: 'IBM Concert, powered by Instana, prices every capability of the tier in one per-host price: infrastructure, containers, APM with 100% of traces and no sampling, digital experience and database monitoring, with 325 GB of traces, metrics and events per host per month included. Third-party logs are the one per-GB item. Fewer surprises at renewal.' };
+const CFG = {"platforms": ["datadog"], "mode": "tools"};
+for (const k of Object.keys(COMP)) if (!CFG.platforms.includes(k)) delete COMP[k];
+const DEFAULTS = { comp:CFG.platforms[0], multi:false, hosts:500, caps:['infra','apm','logs','dx','db'], logVol:'typical', spend:600000, tools:3, mttr:2, catch:2, ctx:2, just:2, cloud:250000, onprem:false, years:true, d1:COMP[CFG.platforms[0]].d1, d2:COMP[CFG.platforms[0]].d2, g:20, di:0, sw:0 };
+let S = { ...DEFAULTS, caps:[...DEFAULTS.caps] };
+let ex = { spend:true, cloud:true };
+let firstCards = true;
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const clamp = (n,a,b) => Math.min(b, Math.max(a, n));
+const money = n => { n = Math.round(n); const a = Math.abs(n); let s; if (a >= 999500) s = (a/1e6).toFixed(a >= 9950000 ? 0 : 1) + 'M'; else if (a >= 1e3) s = (a/1e3).toFixed(0) + 'K'; else s = a.toString(); return (n < 0 ? '−' : '') + '$' + s; };
+const money2 = n => Math.abs(n) >= 999500 && Math.abs(n) < 9950000 ? (n < 0 ? '−' : '') + '$' + (Math.abs(n)/1e6).toFixed(2) + 'M' : money(n);
+const full = n => { n = Math.round(n); return (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US'); };
+const pct = x => Math.round(x * 100) + '%';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isDefault = () => { const a = { ...S, caps:[...S.caps].sort() }, b = { ...DEFAULTS, caps:[...DEFAULTS.caps].sort() }; return JSON.stringify(a) === JSON.stringify(b); };
+const side = v => v < 0 ? money(-v) + ' more with IBM Concert' : money(v) + ' less with IBM Concert';
+
+/* ---------- model: one typical figure per line, midway between the light and heavy assumptions ---------- */
+function compSegs(key, caps, hosts) {
+  const comp = COMP[key]; const segs = [], unpriced = [];
+  CAPS.filter(c => caps.includes(c.id)).forEach(c => { const ph = comp.price(c.id, caps); if (!ph) return; if (ph.unpriced) { unpriced.push({ name: c.name, why: ph.unpriced }); return; } const p = (ph.low + ph.high) / 2; segs.push({ id:c.id, name: c.name + (ph.note ? ' (' + ph.note + ')' : ''), color:c.color, ph: p, yr: p * hosts * 12 }); });
+  comp.extra(caps).forEach(x => { const p = (x.phLow + x.phHigh) / 2; segs.push({ id:x.id, name:x.name, color:x.color, ph: p, yr: p * hosts * 12 }); });
+  return { segs, unpriced };
+}
+function compute() {
+  const hosts = S.hosts, h = Math.max(hosts, 1), comp = COMP[S.comp];
+  const { segs, unpriced } = compSegs(S.comp, S.caps, hosts);
+  const dd = segs.reduce((a,s) => a + s.yr, 0);
+  const essentialsOnly = S.caps.length > 0 && S.caps.every(c => c === 'infra' || c === 'db');
+  const tier = essentialsOnly ? 'essentials' : 'standard';
+  const gb = S.caps.includes('logs') ? P.dd.logs.gb[S.logVol] : 0;
+  const ibmSegs = S.caps.length ? [{ id:'instana', name: 'Concert Observe (Instana ' + (tier === 'essentials' ? 'Essentials' : 'Standard') + ')', color:'--s-ibm', ph: P.ibm[tier], yr: hosts * P.ibm[tier] * 12 }] : [];
+  if (gb > 0) ibmSegs.push({ id:'ilogs', name:'Instana logs, per GB', color:'--s-ibm-logs', ph: gb * P.ibm.logsPerGB, yr: hosts * gb * P.ibm.logsPerGB * 12 });
+  const ibm = ibmSegs.reduce((a,s) => a + s.yr, 0);
+  const diff = dd - ibm;
+  let state;
+  if (S.caps.length === 0 || hosts <= 0 || segs.length === 0) state = 'none';
+  else if (Math.abs(diff) / dd < 0.10) state = 'close';
+  else if (diff > 0) state = 'ibm';
+  else state = 'dd';
+  const cloudYr = (!S.onprem && S.cloud > 0) ? S.cloud * 12 : 0;
+  const turbo = hosts >= 10 ? hosts * P.ibm.turbo * 12 : 0;
+  const optMax = cloudYr * 0.35, optHalf = cloudYr * 0.175;
+  const netOn = CFG.mode === 'net' && state !== 'none' && cloudYr > 0 && turbo > 0;
+  const netMax = diff + optMax - turbo, netHalf = diff + optHalf - turbo, ibmAll = ibm + turbo;
+  return { hosts, h, comp, segs, unpriced, dd, tier, gb, ibmSegs, ibm, diff, state, cloudYr, logsAddon: gb > 0, turbo, optMax, optHalf, netOn, netMax, netHalf, ibmAll, roiMax: ibmAll > 0 ? netMax / ibmAll : 0, roiHalf: ibmAll > 0 ? netHalf / ibmAll : 0 };
+}
+
+/* ---------- render ---------- */
+let liveT;
+function render() {
+  const r = compute();
+  const answered = [true, true, S.hosts > 0, S.caps.length > 0, S.tools > 0, S.mttr > 0 && S.catch > 0 && S.ctx > 0 && S.just > 0, true].filter(Boolean).length;
+  $('progress').textContent = answered + ' of 7 answered';
+  $('exampleTag').hidden = !isDefault();
+  if (S.caps.includes('logs')) { const gb = P.dd.logs.gb[S.logVol]; $('logHint').textContent = '≈ ' + (gb * S.hosts / 1000).toFixed(1) + ' TB a month, about ' + (gb * S.hosts / 30 / 1000).toFixed(2) + ' TB a day, across ' + S.hosts.toLocaleString('en-US') + ' hosts'; }
+  const compName = r.comp.name;
+  const hn = $('heroNum'), hs = $('heroSub'), hl = $('headline');
+  if (r.state === 'none') {
+    $('heroLabel').textContent = ''; $('resTitle').textContent = 'What the same coverage costs, at public list prices'; $('yearsNet').hidden = true; hn.textContent = '–'; hs.textContent = S.caps.length && S.hosts > 0 ? compName + ' does not publish list prices for the capabilities you picked.' : 'Pick at least one capability and a host count of 10 or more.'; hl.textContent = '';
+    ['kpis','gaps','bars','legend','tableTwin','cards','cols','yearsTable','yearsLegend','yearsNet','glance'].forEach(id => $(id).innerHTML = '');
+    $('cards').innerHTML = '<div class="empty" style="padding:.75rem 0">Findings appear once there is a comparison to read.</div>';
+    $('stateNote').hidden = true; renderOpt(r); renderPrint(r); announce(r); return;
+  }
+  const p = Math.abs(r.diff) / r.dd, lbl = $('heroLabel');
+  const dir = r.diff >= 0 ? 'less' : 'more', rel = r.diff >= 0 ? 'below' : 'above';
+  $('resTitle').textContent = 'What the same coverage costs: ' + compName + ' vs IBM Concert, at public list prices';
+  lbl.textContent = 'The same coverage on IBM Concert costs';
+  hn.textContent = money(Math.abs(r.diff)) + ' ' + dir;
+  hs.textContent = 'per year than ' + compName + ' at list prices' + (r.state === 'close' ? ', within 10% of each other.' : ', about ' + pct(p) + ' ' + rel + '.');
+  if (r.state === 'ibm') hl.innerHTML = 'For this coverage, <b>IBM Concert costs less</b> on list prices. Check what you actually pay today and what your next renewal looks like.';
+  else if (r.state === 'dd') hl.innerHTML = 'For this set of capabilities, <b>' + esc(compName) + ' costs less at list</b>. That price leaves out the items listed below, and each product or data type you add is a new line on the bill. IBM Concert includes every capability of the tier in one per-host price, so renewals bring fewer surprises.';
+  else hl.innerHTML = 'On list prices the two are <b>close for this coverage</b>, within 10% of each other. What decides it is your data volumes, the discount you get, and what each takes to run.';
+  if (r.netOn) {
+    const pos = r.netMax >= 0;
+    $('resTitle').textContent = 'Your net benefit with IBM Concert, Observe + Optimize, at public list prices';
+    lbl.textContent = pos ? 'Net of everything, IBM Concert returns' : 'Net of everything, IBM Concert costs';
+    hn.textContent = (pos ? 'up to ' : '') + money2(Math.abs(r.netMax)) + ' a year' + (pos ? '' : ' more');
+    hs.textContent = money(Math.abs(r.diff)) + ' ' + dir + ' on observability tools than ' + compName + ', plus up to ' + money2(r.optMax) + ' in cloud savings with Turbonomic, minus ' + money2(r.turbo) + ' a year for Turbonomic, all at list prices. At half the optimization rate the net ' + (r.netHalf >= 0 ? 'benefit is ' + money2(r.netHalf) : 'result is a cost of ' + money2(-r.netHalf)) + '.';
+    hl.innerHTML = pos ? 'Net of everything, <b>IBM Concert returns up to ' + money2(r.netMax) + ' a year</b> on list prices: the tool comparison, the cloud capacity Turbonomic stops you paying for, and Turbonomic’s own cost. Check what you actually pay today and what your next renewal looks like.' : 'Net of everything, <b>IBM Concert costs ' + money2(-r.netMax) + ' more a year</b> on list prices for this coverage and cloud bill: the cloud savings do not cover the tool difference at this bill size.';
+  }
+
+  const note = $('stateNote');
+  const noteIcon = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="var(--info)" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11zM7.25 7h1.5v4.5h-1.5V7zm0-2.5h1.5V6h-1.5V4.5z"/></svg>';
+  const notes = [];
+  if (CFG.mode === 'net' && !r.netOn && !S.onprem) notes.push('Enter your monthly public cloud bill in question 7, with a host count of 10 or more, to see the net benefit including IBM Concert Optimize.');
+  if (S.multi) notes.push(CFG.platforms.length > 1 ? 'You use more than one platform. This compares ' + compName + ', the one carrying most of your spend; the printed report lists the others. For a combined estimate, talk to an IBM expert.' : 'You use more than one platform. This compares ' + compName + ' only. For a combined estimate across your platforms, talk to an IBM expert.');
+  if (r.unpriced.length) notes.push(compName + ' total excludes ' + r.unpriced.map(u => u.name.toLowerCase() + ' (' + u.why + ')').join(' and ') + '; the IBM side still includes them.');
+  if (r.tier === 'essentials') notes.push('Priced at Instana Essentials because only infrastructure and database monitoring are selected; at Standard the IBM figure would be ' + money(r.hosts * P.ibm.standard * 12) + ' a year.');
+  note.hidden = notes.length === 0; note.innerHTML = notes.length ? noteIcon + '<span>' + esc(notes.join(' ')) + '</span>' : '';
+
+  $('kpis').innerHTML = [
+    { l: 'Your capabilities on ' + compName, v: money(r.dd), s: 'per year · ' + compName + ' list' + (r.unpriced.length ? ' · excludes ' + r.unpriced.map(u => u.name.toLowerCase()).join(', ') : ''), sw: 'var(--s-dd)' },
+    { l: 'IBM Concert', v: money(r.ibm), s: 'per year · Instana ' + (r.tier === 'essentials' ? 'Essentials' : 'Standard') + (r.logsAddon ? ' + logs' : '') + ' list', sw: 'var(--s-ibm)' },
+    { l: 'Per host per month, ' + compName, v: '$' + (r.dd/12/r.h).toFixed(0), s: r.segs.length + ' line item' + (r.segs.length === 1 ? '' : 's'), sw: 'var(--s-dd)' },
+    { l: 'Per host per month, IBM Concert', v: '$' + (r.ibm/12/r.h).toFixed(0), s: r.ibmSegs.length + ' line item' + (r.ibmSegs.length === 1 ? '' : 's'), sw: 'var(--s-ibm)' }
+  ].map(k => `<div class="kpi"><div class="l"><span class="sw" style="background:${k.sw}"></span>${esc(k.l)}</div><div class="v">${esc(k.v)}</div><div class="s">${esc(k.s)}</div></div>`).join('');
+  if (r.netOn) $('kpis').innerHTML = [
+    { l: 'Your capabilities on ' + compName, v: money(r.dd), s: 'per year at list', sw: 'var(--s-dd)' },
+    { l: 'IBM Concert Observe (Instana)', v: money(r.ibm), s: 'per year at list' + (r.logsAddon ? ', logs included' : ''), sw: 'var(--s-ibm)' },
+    { l: 'Cloud savings with Concert Optimize', v: 'up to ' + money2(r.optMax), s: '35% of your ' + money(r.cloudYr) + ' yearly cloud bill; ' + money(r.optHalf) + ' at half that rate', sw: 'var(--s-turbo)' },
+    { l: 'Turbonomic list, ' + r.hosts.toLocaleString('en-US') + ' hosts', v: money(-r.turbo), s: 'per year, $' + P.ibm.turbo.toFixed(2) + ' per host per month', sw: 'var(--s-ibm-logs)' },
+    { l: 'Net benefit, net of everything', v: (r.netMax >= 0 ? 'up to ' : '') + money2(r.netMax), s: money2(r.netHalf) + ' at half the optimization rate', sw: 'var(--interactive)' },
+    { l: 'Return on the IBM Concert spend', v: Math.round(r.roiMax * 100) + '%', s: 'net benefit divided by ' + money(r.ibmAll) + ' of IBM list cost; ' + Math.round(r.roiHalf * 100) + '% at half rate', sw: 'var(--interactive)' }
+  ].map(k => `<div class="kpi"><div class="l"><span class="sw" style="background:${k.sw}"></span>${esc(k.l)}</div><div class="v">${esc(k.v)}</div><div class="s">${esc(k.s)}</div></div>`).join('');
+
+  renderGaps(r);
+
+  const max = Math.max(r.dd, r.ibm, 1);
+  const barHTML = (title, total, segs) => {
+    let x = 0; const parts = segs.map(s => { const w = s.yr / max * 100; const hh = `<div class="seg-b" data-tip="${esc(s.name)}|${full(s.yr)} per year|$${s.ph.toFixed(2)} per host per month" style="left:${x}%;width:calc(${w}% - 2px);background:var(${s.color})"></div>`; x += w; return hh; }).join('');
+    const label = esc(title) + ': ' + segs.map(s => s.name + ' ' + full(s.yr)).join('; ') + ' per year';
+    return `<div class="bar"><div class="t"><b>${esc(title)}</b><span>${full(total)}</span></div><div class="track" role="img" aria-label="${esc(label)}">${parts}</div></div>`;
+  };
+  const ticks = [0, .25, .5, .75, 1].map(f => `<span style="left:${f*100}%">${money(max * f)}</span>`).join('');
+  $('bars').innerHTML = barHTML(compName + ', at list', r.dd, r.segs) + barHTML('IBM Concert, at list', r.ibm, r.ibmSegs) + `<div class="axis">${ticks}</div>`;
+  $('legend').innerHTML = [...r.segs, ...r.ibmSegs].map(s => `<span><i style="background:var(${s.color})"></i>${esc(s.name)}</span>`).join('');
+
+  const rows = [...r.segs.map(s => [s.name, compName, s.ph, s.yr]), ...r.ibmSegs.map(s => [s.name, 'IBM Concert', s.ph, s.yr])];
+  $('tableTwin').innerHTML = `<table><thead><tr><th>Line item</th><th>Side</th><th class="r">Per host per month</th><th class="r">Per year</th></tr></thead><tbody>${rows.map(x => `<tr><td>${esc(x[0])}</td><td>${esc(x[1])}</td><td class="r">$${x[2].toFixed(2)}</td><td class="r">${full(x[3])}</td></tr>`).join('')}<tr><td><b>${esc(compName)} total</b></td><td></td><td class="r">$${(r.dd/12/r.h).toFixed(2)}</td><td class="r"><b>${full(r.dd)}</b></td></tr><tr><td><b>IBM Concert total</b></td><td></td><td class="r">$${(r.ibm/12/r.h).toFixed(2)}</td><td class="r"><b>${full(r.ibm)}</b></td></tr></tbody></table>`;
+
+  renderGlance(r);
+  renderCards(r);
+  renderYears(r);
+  renderOpt(r);
+  renderPrint(r);
+  bindTips();
+  announce(r);
+  writeHash();
+}
+function announce(r) { clearTimeout(liveT); liveT = setTimeout(() => { $('live').textContent = r.state === 'none' ? 'Pick at least one capability and a host count.' : ($('heroNum').textContent + ' ' + $('heroSub').textContent); }, 800); }
+
+function renderGlance(r) {
+  if (CFG.platforms.length < 2) { $('glance').parentElement.hidden = true; return; }
+  const ibmPh = r.ibmSegs.reduce((a,s) => a + s.ph, 0);
+  const rows = Object.keys(COMP).map(k => { const { segs, unpriced } = compSegs(k, S.caps, S.hosts); const ph = segs.reduce((a,s) => a + s.ph, 0); return { name: COMP[k].name, ph, n: segs.length, un: unpriced.map(u => u.name.toLowerCase()).join(', '), sel: k === S.comp }; });
+  rows.push({ name: 'IBM Concert' + (r.logsAddon ? ' (Instana + logs)' : ' (Instana)'), ph: ibmPh, n: r.ibmSegs.length, un: '', ibm: true });
+  $('glance').innerHTML = `<table><thead><tr><th>Platform</th><th class="r">Per host per month</th><th class="r">Per year, ${S.hosts.toLocaleString('en-US')} hosts</th><th>Notes</th></tr></thead><tbody>${rows.map(x => `<tr${x.sel ? ' style="font-weight:500"' : ''}><td>${esc(x.name)}${x.sel ? ' (selected)' : ''}</td><td class="r">$${x.ph.toFixed(0)}</td><td class="r">${money(x.ph * 12 * S.hosts)}</td><td>${x.un ? 'excludes ' + esc(x.un) + ' (not publicly priced)' : (x.ibm ? 'every tier capability included' : x.n + ' line item' + (x.n === 1 ? '' : 's'))}</td></tr>`).join('')}</tbody></table><div class="hero-sub" style="margin-top:.5rem">Observability capabilities only, at each vendor’s public list prices with the volume assumptions in the footnotes. Where a vendor publishes no price for a capability, its row excludes it, so rows are not always like-for-like.</div>`;
+}
+
+function renderCards(r) {
+  const cards = [];
+  const add = (cls, title, body, src, ask) => cards.push({ cls, title, body, src, ask });
+  const compName = r.comp.name;
+  if (S.multi) add('info', 'More than one platform means more than one bill', `You said you use more than one platform. Each one carries its own license, data charges and overlap, and the comparison above covers only ${compName}. A single per-host price for the whole stack is usually where the larger saving is.`, 'IBM Concert, powered by Instana: one price per host for every capability of the tier.', 'Which platforms overlap, and what would it take to run the whole stack on one?');
+  if (S.spend > 0) {
+    const lo = r.dd, said = ex.spend ? 'The example spend of ' + full(S.spend) : 'You told us ' + full(S.spend);
+    const band = compName + ' list for the same observability capabilities' + (r.unpriced.length ? ' (excluding ' + r.unpriced.map(u => u.name.toLowerCase()).join(', ') + ')' : '') + ' comes to about ' + money(lo) + '.';
+    if (S.spend < 0.6 * lo) add('warn', 'Your spend is well below list for this coverage', `${said} a year. ${band} That usually means a deep introductory discount, a smaller footprint than you entered, or thinner coverage.`, 'Deep discounts tend to shrink at renewal; see the three-year view.', 'How long is the discounted price valid, and if nothing changes except volume growth, what does this cost in year two?');
+    else if (S.spend < 0.9 * lo) add('info', 'Your spend is below list, but not far below', `${said} a year. ${band} The gap is within what a normal discount or a few unselected products explains.`, 'IBM Concert list, powered by Instana: $' + P.ibm.standard.toFixed(2) + ' per host per month, every tier capability included.', 'Which products are excluded from that price, and how long does it hold?');
+    else if (S.spend <= 1.1 * lo) add('info', 'Your spend is about list price for this coverage', `${said} a year. ${band} There is usually room to consolidate products or renegotiate, and a single per-host price makes the next renewal easier to forecast.`, 'IBM Concert list, powered by Instana: $' + P.ibm.standard.toFixed(2) + ' per host per month, every tier capability included.', 'Which line items grew fastest since the last renewal, and which two products answer the same question?');
+    else if (S.spend <= 1.5 * lo) add('info', 'Your spend is above list, within what on-demand rates or extra tools explain', `${said} a year. ${band} Usage above a commitment is usually billed at higher on-demand rates.`, 'Our logs assumption is ' + P.dd.logs.gb[S.logVol] + ' GB per host per month; the real number is the first thing to check.', 'Which line items run above commitment, and what would a per-host price do to that?');
+    else add('warn', 'Your spend is well above what list prices imply', `${said} a year. ${band} Common reasons: overlapping tools, data volumes well above our assumptions, or on-demand rates.`, 'Our logs assumption is ' + P.dd.logs.gb[S.logVol] + ' GB per host per month; the real number is the first thing to check.', 'What is the actual GB per host per month, and which tools overlap?');
+  }
+  if (S.tools >= 3) add(S.tools === 4 ? 'warn' : 'info', S.tools === 4 ? 'Seven or more tools: a consolidation candidate' : 'Four to six tools: check for overlap', 'Each tool adds its own license, data store, integrations and context switching during incidents. Listing which questions each tool answers usually finds two or three that answer the same one.', 'Dahl Sverige went from 10 monitoring tools to 4 with Instana (IBM case study, 2026). Leaf Group reported a 66% reduction in monitoring cost (IBM case study, 2021). Illustrative only; results vary.', 'Which tools would you keep if you could keep only three?');
+  if (S.caps.includes('logs')) {
+    if (S.logVol === 'heavy') add('warn', 'Logs are probably your biggest line', `At ${P.dd.logs.gb.heavy} GB per host per month, indexing dominates the bill on a per-event platform. Tiering, sampling and pipelines reduce volume before it is billed. IBM prices third-party logs per GB too, from $${P.ibm.logsPerGB} per GB, so the per-host price does not hide this cost.`, 'Datadog list: $0.10 per ingested GB plus $1.70 per million indexed events at 15-day retention. Instana Logs in context: from $0.351 per GB.', 'What share of your logs is ever searched, and what retention does each tier of application actually need?');
+    else add('info', 'Logs pricing is where bills drift', 'Per-GB and per-event charges grow with every new service, even when the host count does not. Knowing your GB per host per month is the single best way to tighten this estimate.', 'IBM Concert, powered by Instana, includes ' + P.ibm.fairUse.standard + ' GB of traces, metrics and events per Standard host per month; third-party logs are priced per GB.', 'How did your indexed log volume change over the last twelve months?');
+  }
+  if (S.mttr >= 3 || S.catch === 3) add('warn', 'Incident outcomes may not match the spend', `${S.mttr >= 3 ? 'Four hours or more to find and fix an incident' : 'Catching issues after users do'} is the cost that does not show on an invoice. Full-fidelity tracing and automatic topology are the capabilities most often credited with shortening it, and in IBM Concert they are in the per-host price.`, 'Forrester TEI of IBM Instana Observability, Dec 2023, commissioned by IBM: the composite organization was modeled with MTTR reduced by 70% and revenue-impacting incidents reduced by up to 60%. Composite projection, not a customer average.', 'What share of incidents are first reported by users, and how many tools does a bridge call open before the cause is found?');
+  else if (S.mttr === 2 && S.catch === 2) add('info', 'Incident handling is average; there is headroom', 'One to four hours per incident and catching issues only sometimes is typical. The question is whether the tools you pay for are shortening it.', 'Forrester TEI of IBM Instana Observability, Dec 2023, commissioned by IBM: MTTR reduced 70% and SRE/DevOps productivity up 40% for the composite organization. Composite projection, not a customer average.', 'Which tool shortened an incident last quarter, and which only stored data?');
+  if (S.ctx === 3) add('info', 'Application and network context live in separate tools', 'When the application team and the network team look at different screens, the bridge call runs longer. Network observability is a separate IBM offering and is not priced here.', 'No price impact in this estimate.', 'Who owns the first 30 minutes of a cross-tier incident, and which screen do they open first?');
+  if (S.just === 3 || S.just === 2) add(S.just === 3 ? 'warn' : 'info', S.just === 3 ? 'You do not think the spend is earning its keep' : 'You are not sure the spend is earning its keep', 'Before your next renewal, list which tools shortened an incident this quarter and which only stored data. The invoice shows what each tool costs, not which ones changed an outcome.', 'No price impact in this estimate.', 'Which tools shortened an incident this quarter, and which only stored data?');
+  add('info', 'List prices are the starting point, not the quote', 'Vendors discount list in year one. The questions that matter: how long is the discounted price valid, what assumptions about data volume keep it low, and what does it cost at renewal if only volume grows? The three-year view below lets you try those numbers.', S.comp === 'datadog' ? 'Datadog on-demand rates run 16% to 50% above annual list, and usage above a commitment is billed at those rates.' : 'Discount evidence has been researched for Datadog only; the three-year defaults for ' + compName + ' are placeholders.', 'What does the renewal quote look like if only volume grows?');
+  const sev = { warn:'needs attention', info:'worth a look', good:'upside' };
+  const openSet = new Set([...document.querySelectorAll('#cards details[open]')].map(d => d.dataset.k));
+  $('cards').innerHTML = cards.map((c, i) => `<details class="${c.cls}" data-k="${esc(c.title)}"${(firstCards && i < 3) || openSet.has(c.title) ? ' open' : ''}><summary><span class="dot" aria-hidden="true"></span><span class="sr">${sev[c.cls] || ''}: </span>${esc(c.title)}<svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 11 3 6l.7-.7L8 9.6l4.3-4.3.7.7z"/></svg></summary><div class="ai-body"><p>${esc(c.body)}</p><div class="src">${esc(c.src)}</div>${c.ask ? `<div class="ask"><b>Worth asking:</b> ${esc(c.ask)}</div>` : ''}</div></details>`).join('');
+  firstCards = false;
+  syncExpandAll();
+}
+
+function renderYears(r) {
+  $('years').hidden = !S.years;
+  if (!S.years || r.state === 'none') return;
+  $('d1ev').textContent = COMP[S.comp].dEv; $('d2ev').textContent = COMP[S.comp].dEv; document.querySelector('label[for="d1"]').textContent = COMP[S.comp].name + ' year-1 discount off list';
+  if (S.d2 > S.d1) $('d2ev').textContent = 'renewal discount is above the year-one discount; usually it is the reverse';
+  const d1 = S.d1/100, d2 = S.d2/100, g = S.g/100, di = S.di/100;
+  const dd = [r.dd*(1-d1), r.dd*(1+g)*(1-d2), r.dd*(1+g)*(1+g)*(1-d2)];
+  const ibm = [r.ibm*(1-di) + S.sw, r.ibm*(1+g)*(1-di), r.ibm*(1+g)*(1+g)*(1-di)];
+  const max = Math.max(...dd, ...ibm, 1);
+  const nice = Math.pow(10, Math.floor(Math.log10(max))); const top = Math.ceil(max / nice) * nice;
+  const grid = [0.5, 1].map(f => `<div class="grid-l" style="bottom:${f*100}%"><span>${money(top*f)}</span></div>`).join('');
+  const compName = r.comp.name, ibmLabel = 'IBM Concert' + (S.di ? ', after ' + S.di + '% discount' : ', list');
+  $('cols').innerHTML = grid + [0,1,2].map(i => `<div class="yr" role="img" aria-label="Year ${i+1}: ${esc(compName)} ${full(dd[i])}, IBM Concert ${full(ibm[i])}"><span class="v2">${money(dd[i])} vs ${money(ibm[i])}</span><div class="c" data-tip="Year ${i+1} · ${esc(compName)}|${full(dd[i])}|after ${i===0?S.d1:S.d2}% discount" style="height:${dd[i]/top*100}%;background:var(--s-dd)"></div><div class="c" data-tip="Year ${i+1} · IBM Concert|${full(ibm[i])}|${S.di ? 'after ' + S.di + '% discount' : 'list'}${i===0&&S.sw?', incl. switching cost':''}" style="height:${ibm[i]/top*100}%;background:var(--s-ibm)"></div><div class="yl">Year ${i+1}</div></div>`).join('');
+  $('yearsLegend').innerHTML = `<span><i style="background:var(--s-dd)"></i>${esc(compName)}, after discount</span><span><i style="background:var(--s-ibm)"></i>${esc(ibmLabel)}</span>`;
+  $('yearsTable').innerHTML = `<table><thead><tr><th>Year</th><th class="r">${esc(compName)}, after discount</th><th class="r">${esc(ibmLabel)}</th><th class="r">Difference</th></tr></thead><tbody>${[0,1,2].map(i => `<tr><td>Year ${i+1}${i===0&&S.sw?' (incl. switching cost)':''}</td><td class="r">${full(dd[i])}</td><td class="r">${full(ibm[i])}</td><td class="r">${full(dd[i]-ibm[i])}</td></tr>`).join('')}<tr><td><b>Three years</b></td><td class="r"><b>${full(dd[0]+dd[1]+dd[2])}</b></td><td class="r"><b>${full(ibm[0]+ibm[1]+ibm[2])}</b></td><td class="r"><b>${full(dd[0]+dd[1]+dd[2]-ibm[0]-ibm[1]-ibm[2])}</b></td></tr></tbody></table>`;
+  const yn = $('yearsNet');
+  if (r.netOn) {
+    const cs = [r.optMax, r.optMax*(1+g), r.optMax*(1+g)*(1+g)], ch = cs.map(x => x/2), tb = [r.turbo*(1-di), r.turbo*(1+g)*(1-di), r.turbo*(1+g)*(1+g)*(1-di)];
+    const netM = [0,1,2].map(i => dd[i]-ibm[i]+cs[i]-tb[i]), netH = [0,1,2].map(i => dd[i]-ibm[i]+ch[i]-tb[i]);
+    const tot = a => a[0]+a[1]+a[2];
+    yn.hidden = false;
+    yn.innerHTML = `<b>Three-year net benefit, net of everything: ${tot(netM) >= 0 ? 'up to ' : ''}${money2(tot(netM))}</b> (${money2(tot(netH))} at half the optimization rate). The tool difference after discounts, plus the cloud savings, minus Turbonomic at list${S.di ? ' less your ' + S.di + '% discount' : ''}, each growing with your estate.`;
+    $('yearsTable').innerHTML += `<table style="margin-top:.75rem"><thead><tr><th>Year</th><th class="r">Tool difference</th><th class="r">Cloud savings, up to 35%</th><th class="r">Turbonomic</th><th class="r">Net benefit</th><th class="r">Net at half rate</th></tr></thead><tbody>${[0,1,2].map(i => `<tr><td>Year ${i+1}</td><td class="r">${full(dd[i]-ibm[i])}</td><td class="r">${full(cs[i])}</td><td class="r">${full(-tb[i])}</td><td class="r">${full(netM[i])}</td><td class="r">${full(netH[i])}</td></tr>`).join('')}<tr><td><b>Three years</b></td><td class="r"><b>${full(tot(dd)-tot(ibm))}</b></td><td class="r"><b>${full(tot(cs))}</b></td><td class="r"><b>${full(-tot(tb))}</b></td><td class="r"><b>${full(tot(netM))}</b></td><td class="r"><b>${full(tot(netH))}</b></td></tr></tbody></table>`;
+  } else { yn.hidden = true; yn.innerHTML = ''; }
+}
+
+function gapItems(key, caps) {
+  const g = GAPS[key]; if (!g) return { ontop: [], separate: [], hiddenN: 0 };
+  const rel = i => !i.cap || i.cap === 'all' || caps.includes(i.cap);
+  const ontop = g.ontop.filter(rel), hiddenN = g.ontop.length - ontop.length;
+  return { ontop, separate: g.separate, hiddenN };
+}
+function renderGaps(r) {
+  const compName = r.comp.name, g = GAPS[S.comp], it = gapItems(S.comp, S.caps);
+  const row = i => `<tr${i.when ? ` data-tip="${esc(i.item)}|${esc(i.price + (i.unit ? ' ' + i.unit : ''))}|${esc(i.when)}"` : ''}><td>${esc(i.item)}</td><td class="r">${esc(i.price)}${i.unit ? `<small>${esc(i.unit)}</small>` : ''}</td></tr>`;
+  const body = (title, items) => items.length ? `<tbody><tr><th>${esc(title)}</th><th class="r">List price</th></tr>${items.map(row).join('')}</tbody>` : '';
+  const chev = '<svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 11 3 6l.7-.7L8 9.6l4.3-4.3.7.7z"/></svg>';
+  const sep = it.separate.length ? `<details class="gap-more"><summary>Separate products on the ${esc(compName)} price list, not in this comparison (${it.separate.length})${chev}</summary><table class="gap-t">${body('Separate product', it.separate)}</table></details>` : '';
+  $('gaps').innerHTML = `<h4>What the ${esc(compName)} list price does not include</h4>` +
+    `<div class="gaps-sub">Read from ${esc(compName)}\u2019s own price list, checked ${esc(g.checked)}. Shown for the capabilities you selected; list prices in USD. Hover an item for when it applies.</div>` +
+    (it.ontop.length ? `<table class="gap-t">${body('Charged on top of the lines above', it.ontop)}</table>` : '') +
+    (it.hiddenN ? `<div class="more">${it.hiddenN} more item${it.hiddenN === 1 ? '' : 's'} apply to capabilities you did not select.</div>` : '') +
+    sep +
+    `<div class="ibm"><b>${esc(IBM_SIDE.title)}</b>${esc(IBM_SIDE.text)}</div>`;
+}
+function renderOpt(r) {
+  const el = $('optPanel'), net = CFG.mode === 'net';
+  const head = '<div class="ins-head"><h3>Beyond the observability platform</h3></div><div class="ins-sub">IBM Concert Optimize, powered by IBM Turbonomic, cuts the cloud capacity you pay for but do not use. ' + (net ? 'Counted in the net benefit above.' : 'Kept separate from the tool comparison above; nothing here is counted in it.') + '</div>';
+  if (S.onprem) { el.innerHTML = head + '<div class="muted">You told us your estate is mostly on-premises. Turbonomic also optimizes on-premises virtual capacity; that saving is not modeled on this page, so ask an IBM expert to size it.</div>'; return; }
+  if (!(S.cloud > 0)) { el.innerHTML = head + '<div class="muted">Enter your monthly public cloud bill in question 7 to see how much more you could save with Concert Optimize.</div>'; return; }
+  const yr = S.cloud * 12, up = yr * 0.35, half = yr * 0.175, hosts = S.hosts >= 10 ? S.hosts : 0, turbo = hosts * P.ibm.turbo * 12;
+  const be = turbo > 0 ? (turbo / yr * 100) : 0;
+  const additional = r.state !== 'none' && r.diff > 0;
+  const kpi = (l, v, s) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+  el.innerHTML = head +
+    `<div><div class="hero-label">${additional ? 'On top of the tool saving above' : 'On your public cloud bill'}</div><div class="hero-num">Save ${additional ? 'an additional' : 'up to'} ${money(up)} a year</div><div class="hero-sub">up to 35% of ${ex.cloud ? 'the example' : 'your'} public cloud bill of ${full(S.cloud)} a month${ex.cloud ? ' (replace it with yours in question 7)' : ', as entered in question 7'}.</div></div>` +
+    '<div class="kpis">' +
+      kpi('Your cloud bill', money(yr), 'per year, from ' + full(S.cloud) + ' a month') +
+      kpi('Up to 35% less', money(up), 'Forrester’s composite Turbonomic customer; the most this page counts') +
+      kpi('At half that rate', money(half), '17.5% of the bill' + (turbo > 0 ? '; ' + money(half - turbo) + ' after Turbonomic list' : '')) +
+      (turbo > 0 ? kpi('Turbonomic list, ' + hosts.toLocaleString('en-US') + ' hosts', money(turbo), 'per year; pays for itself once it finds ' + (be < 10 ? be.toFixed(1) : be.toFixed(0)) + '% of your bill') : kpi('Turbonomic list', '–', 'enter a host count of 10 or more in question 3')) +
+    '</div>' +
+    `<p>Turbonomic makes the resourcing changes itself, by policy, so the saving comes from capacity you stop paying for.${r.comp.hasCcm ? ' Datadog’s Cloud Cost Management reports and recommends for about ' + money(yr * 0.0075) + ' a year on this bill; it does not make the changes.' : ' ' + esc(r.comp.name) + ' publishes no price for a cloud cost management product.'} Your own result depends on how much unused capacity you have and can be lower, including zero.${net ? '' : ' None of this is counted in the tool comparison above.'}</p>` +
+    '<a class="btn tertiary" href="https://www.ibm.com/products/turbonomic" target="_blank" rel="noopener">Explore Concert Optimize<span class="sr"> (opens in a new tab)</span> <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9 2v1.5h2.4L6 8.9 7.1 10l5.4-5.4V7H14V2H9zM12 12.5H3.5V4H7V2.5H2v11.5h11.5V9H12v3.5z"/></svg></a>';
+}
+
+const SEGS = { tools:{ 1:'1', 2:'2–3', 3:'4–6', 4:'7 or more' }, mttr:{ 1:'Under 1 hour', 2:'1–4 hours', 3:'4–8 hours', 4:'More than 8 hours' }, catch:{ 1:'Usually', 2:'Sometimes', 3:'Rarely' }, ctx:{ 1:'Yes, in one place', 2:'Partly', 3:'No, separate tools' }, just:{ 1:'Yes', 2:'Not sure', 3:'No' } };
+function renderPrint(r) {
+  const items = [['Annual observability spend', S.spend > 0 ? full(S.spend) : 'not given'], ['Platform today', COMP[S.comp].name + (S.multi ? ' (more than one platform in use)' : '')], ['Hosts monitored', S.hosts.toLocaleString('en-US')], ['Capabilities', CAPS.filter(c => S.caps.includes(c.id)).map(c => c.name).join(', ') + (S.caps.includes('logs') ? ' (logs ' + S.logVol + ')' : '')], ['Tools in stack', SEGS.tools[S.tools] || '–'], ['Typical incident', (SEGS.mttr[S.mttr] || '–') + ' · catch before users: ' + (SEGS.catch[S.catch] || '–') + ' · app+network context: ' + (SEGS.ctx[S.ctx] || '–') + ' · outcomes justify spend: ' + (SEGS.just[S.just] || '–')], ['Monthly cloud bill', S.onprem ? 'mostly on-premises' : (S.cloud > 0 ? full(S.cloud) : 'not given')]];
+  $('printInputs').innerHTML = items.map(x => `<div><small>${esc(x[0])}</small>${esc(x[1])}</div>`).join('');
+}
+
+/* ---------- tooltips ---------- */
+function bindTips() {
+  const tip = $('tip');
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    const show = e => { const [a,b,c] = el.dataset.tip.split('|'); tip.innerHTML = `<b>${esc(b)}</b>${esc(a)}${c ? '<br>' + esc(c) : ''}`; tip.style.display = 'block'; const tw = tip.offsetWidth || 288, th = tip.offsetHeight || 60; const x = e.clientX, y = e.clientY; tip.style.left = Math.max(8, Math.min(x + 12, window.innerWidth - tw - 8)) + 'px'; tip.style.top = (y + 14 + th > window.innerHeight ? y - th - 10 : y + 14) + 'px'; };
+    const hide = () => tip.style.display = 'none';
+    el.onpointermove = show; el.onpointerleave = hide;
+  });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('tip').style.display = 'none'; });
+
+/* ---------- static sections ---------- */
+const FOOT_COMP = {
+  datadog: ['Datadog prices are the "billed annually" list prices on datadoghq.com/pricing for the US region, read 18 October 2026. On-demand rates run 16% to 20% higher for host-based products and 44% to 50% higher for log indexing, synthetics, RUM and custom events (log ingestion is $0.10 per GB on both); usage above a monthly commitment is billed at those rates. EU list equals US; Japan, UK and US-Fed regions are 20% to 25% higher. Datadog prices per host, per GB, per million events, per session, per test and per seat; we convert each to a per-host-per-month figure using the volume assumptions below. Where a price depends on volume, the calculator uses one typical figure, midway between the light and heavy assumptions described for that line, and the table under the chart shows the figure used.',
+  'Infrastructure: low uses Infrastructure Pro at $15 per host (5 containers and 100 custom metrics included). High uses Infrastructure Enterprise at $23 plus 5 extra containers at $1 each and 200 extra custom metrics at $5 per 100 indexed metrics (datadoghq.com/pricing/list). Datadog’s 2018 Docker adoption report found organizations using an orchestrator ran about 11.5 containers per host, so the Pro allotment of 5 is routinely exceeded; third-party sizing guides describe a well-instrumented service emitting several hundred custom metrics. A Kubernetes node counts as a host; pods do not.',
+  'Application performance: with Infrastructure selected, low uses APM at $31 per host (150 GB of ingested spans and 1 million indexed spans included) and high uses APM Enterprise at $40, which bundles Continuous Profiler and Data Streams Monitoring. Without Infrastructure, Datadog sells APM standalone at $36 and $47. Only hosts that emit traces are billed as APM hosts; we assume all hosts do.',
+  'Logs: $0.10 per ingested GB plus $1.70 per million indexed events at 15-day retention (3-day $1.06, 7-day $1.27, 30-day $2.50). We assume 1 million events per GB (Datadog’s sizing guidance gives 0.5 KB to 3 KB per event with a 1 KB worked example) and that 50% (low) to 100% (high) of ingested logs are indexed; 100% is the like-for-like case against Instana, which keeps full-fidelity data. Light, typical and heavy are 10, 30 and 100 GB per host per month, which is about 0.3 to 3 GB per host per day; your own number replaces all of this.',
+  'Digital experience: $2 (low) to $8 (high) per host per month covers Real User Monitoring (Measure $0.15 plus Investigate $3 per 1,000 sessions, both required), Synthetic API tests at $5 per 10,000 runs and browser tests at $12 per 1,000 runs, at modest volumes of roughly 300 to 1,500 sessions and 2,000 to 5,000 test runs per host per month. Database monitoring: $70 per database host, with database hosts assumed to be 5% (low) to 15% (high) of all hosts; Database Monitoring requires Infrastructure Monitoring on the database host, which is added at $15 to $23 when Infrastructure is not selected.',
+  ],
+  dynatrace: ['Dynatrace prices are the Dynatrace Platform Subscription (DPS) list rate card on dynatrace.com/pricing and its licensing docs, read and verified 18 October 2026, converted to monthly at 730 hours. Full-Stack Monitoring bills $0.01 per memory-GiB-hour of host RAM (rounded up to 0.25 GiB, 4 GiB minimum), so the APM line scales with host memory: we assume 16 GiB (low) to 32 GiB (high) per host, giving $116.80 to $233.60; Full-Stack includes infrastructure monitoring, pod-hours for pods on Full-Stack hosts, a trace allowance (200 KiB per minute per GiB) and 900 metric data points per GiB per 15 minutes, so the infrastructure line is $0 when APM is selected. Infrastructure Monitoring alone is $0.04 per host-hour ($29.20) for any host size, plus Kubernetes Platform Monitoring at $0.002 per pod-hour ($1.46 per pod; we assume 10 pods per host) in the high case, since pods on infrastructure-only hosts are billed. Database Monitoring is a separate meter at $0.11 per database-instance-hour ($80.30 per instance), applied to 5% to 15% of hosts. Logs: $0.20 per GiB ingest and process, plus pay-per-query retention at $0.0007 per GiB-day for 15 days and queries at $0.0035 per GiB scanned (we assume twice the ingested volume is scanned) for the low, or retention with included queries at $0.02 per GiB-day for 15 days for the high; about $0.22 to $0.50 per GB, and Dynatrace notes processing can enlarge billable volume. Real User Monitoring $2.25 per 1,000 sessions (counted per application per hour), HTTP synthetic monitors $1 per 1,000 requests, browser monitors $4.50 per 1,000 billable actions, at the same session and test-run volumes as the Datadog model. Annual platform-level commitment (amount not published); overage billed monthly at the same rates; prices in USD with published currency conversion factors. Dynatrace ships a Cost & Carbon Optimization app and a Cloud Cost Management preview, but neither has a rate-card price, so the comparison is observability only.'],
+  newrelic: ['New Relic prices are the public usage-based list prices on newrelic.com/pricing and its billing docs, read and verified 18 October 2026. There is no per-host price: data ingest is $0.40 per GB (Original) to $0.60 per GB (Data Plus) beyond 100 GB free per month, measured on stored volume after processing and rounded up to whole GB; full-platform users are $349 per user per month on the Pro edition with annual commitment ($418.80 month to month), core users $49 and basic users free, and only full-platform users can open the APM and infrastructure interfaces. Conversions: infrastructure telemetry 2 to 5 GB per host per month, APM traces 5 to 15 GB per host per month, logs at the GB per host you chose; synthetic checks at $0.005 per non-ping check beyond the 1 million checks a month included with Pro, at 2,000 to 5,100 runs per host per month across your host count; one full-platform user per 20 hosts (low) to one per 8 hosts (high), shown as its own line. Database monitoring has no separate price and is billed as ingest. The 100 GB free allowance is ignored as small at this scale; extended retention is $0.05 per GB and the EU data center adds $0.05 per GB, neither modeled. New Relic’s Cloud Cost Intelligence (GA April 2026) requires the Advanced Compute add-on and is priced on billing-export size without a public rate, so the comparison is observability only.'],
+  grafana: ['Grafana Cloud prices are the Pro tier usage rates on grafana.com/pricing and its billing docs, read and verified 18 October 2026, for plans started after 13 February 2026 (Enterprise starts at a $25,000 per year commitment with lower unit rates and is not modeled). Metrics $6.50 per 1,000 active series billed at the 95th percentile, assumed at 1,000 (low) to 3,000 (high) series per host; Kubernetes Monitoring $0.01 per host-hour ($7.20) plus $0.0007 per container-hour ($0.50 per container, 10 per host) in the high case; Application Observability $0.025 per host-hour ($18) plus traces at $0.45 to $0.55 per GB (5 to 15 GB per host per month); logs at $0.45 per GB (processing $0.05 plus writing $0.40, with 30-day retention included) to $0.55 per GB (Grafana’s own per-GB-ingested summary, which adds the $0.10 retain component); Database Observability $0.07 per host-hour (about $51 per database host), with database hosts 5% to 15% of all hosts; Frontend Observability $0.75 per 1,000 sessions, synthetic API tests $5 per 10,000 and browser tests $50 per 10,000 executions (an execution is one probe location per minute of run time), at the same volumes as the Datadog model; active Grafana users $8 per user, one per 20 to one per 8 hosts, shown as its own line. Automatic volume-discount tiers, the $19 platform fee and the included allowances (10k series, 50 GB per signal, 2,232 host-hours, 50k sessions, 100k API and 10k browser executions, 3 users) are ignored, which slightly overstates Grafana at small scale. Grafana’s cost-management features cover Grafana Cloud spend only, not cloud bills, so the comparison is observability only.'],
+  splunk: ['Splunk Observability Cloud prices are the "starts at" per-host list prices on splunk.com, billed annually, read and verified 18 October 2026: Infrastructure $15 (includes synthetic uptime monitoring, Log Observer Connect and Network Explorer), App & Infra $60 (adds APM with Always-On Profiling and synthetic API monitoring), End-to-End $75 (adds Real User Monitoring and browser synthetics). The tier that covers your selected capabilities is applied to every host; hosts are counted as the monthly average of unique hosts sending data, a Kubernetes node is a host. Splunk’s published entitlements give 10 containers and 100 custom metrics per host on the Standard edition (20 and 200 on Enterprise) and bill sustained excess at 150% of effective list price; which edition the public tiers are is not stated, so no low-high range is shown. Log Observer Connect is included at no charge but needs Splunk Enterprise or Splunk Cloud Platform, whose log pricing is quote-only, so logs are excluded from the Splunk total while the IBM side still includes them; Database Monitoring is an optional add-on priced per database instance without a public rate and is excluded. No monthly-billing prices are published. Splunk publishes no cloud cost management product in this suite, so the comparison is observability only.']
+};
+
+const FOOT = [
+  'What the [platform] list price does not include: each item was read from the vendor’s own price list or billing documentation on 23 October 2026, with the list price shown as published. The list covers the items a buyer most often pays for on top of the lines compared here and is not exhaustive; it is filtered to the capabilities selected.',
+  'What the IBM figures are: estimates for IBM Concert platform Observe (powered by IBM Instana) and, in the note at the end, Optimize (powered by IBM Turbonomic), priced at Instana and Turbonomic public list prices because Concert platform pricing is based on resource units and is not published. The headline covers observability tools only, at list prices, at one typical volume assumption per line; cloud and infrastructure savings are never added to it. The three-year view is list costs only.',
+  'IBM Instana list prices on IBM Store, read 18 October 2026: Essentials $21.20 and Standard $79.50 per managed virtual server (MVS) per month, SaaS, annual term (AWS Marketplace lists $255 and $954 per MVS per year; both tiers rose 6% from $20 and $75 between October 2025 and February 2026). Every feature of the tier is included. Tier choice in this model: Essentials when you select only infrastructure and/or database monitoring (IBM’s service description places database monitoring in the infrastructure offering; whether query-level detail matches Datadog Database Monitoring is pending confirmation); Standard when you select tracing, digital experience or logs. Standard adds tracing, serverless, synthetics run from points of presence you host (execution from IBM-managed locations is a separate add-on from $0.00031 per test run, about $0.62 to $1.55 per host per month at our volumes, not priced here), web and mobile experience, AI-assisted incident features and LLM observability. Fair use covers 50 GB (Essentials) and 325 GB (Standard) of traces, metrics, events and beacons per MVS per month, pooled; extra ingest is $21.20 per 100 GB prepaid or $0.27 per GB on demand. Third-party logs are a separate "Logs in context" add-on from $0.351 per GB at 30-day retention, which we apply to the GB per host you chose on top of the tier. IBM’s pricing FAQ lists physical machines, virtual servers and Kubernetes worker nodes as the MVS unit; pods and containers are not a unit it names. IBM states a standard minimum order of 10 hosts.',
+  'IBM Turbonomic: IBM publishes no per-MVS list price on ibm.com; the public IBM-published prices are the AWS Marketplace listings (US-only when announced): SaaS at $37,909.82 per 12 months for 200 MVS ($15.80 per MVS per month) and on-premises at $50,760 per 12 months for 200 MVS ($21.15 per MVS per month); the calculator uses $18.48, midway between the two. IBM’s Managed Virtual Server definition counts each virtual machine, cloud instance or unpartitioned physical server that Turbonomic actively manages; IBM does not publish how Kubernetes nodes count, so one per host is an assumption that may over- or understate the Turbonomic line for container-heavy estates. Forrester’s 2024 composite (commissioned by IBM) assumed $135 per VM per year; UK public-sector reseller pricing implies about $27 per MVS per month. A percentage-of-cloud-spend license also exists. Datadog Cloud Cost Management moved in 2026 from $7.50 per host to spend-based pricing: Pro at $5 and Enterprise at $10 per $1,000 of monthly cloud and SaaS spend (0.5% to 1%); some existing customers may remain on legacy per-host pricing. Cloud Cost Management reports, allocates and recommends, with limited one-click and scheduled automations; Turbonomic executes resourcing actions by policy. The two are not identical in scope.',
+  'The three-year view multiplies the annual figure by your discount and growth assumptions, with growth applied to both sides, no IBM discount assumed, and your own one-time switching cost added to IBM year one. Defaults: 20% off list in year one (the only measured dataset, Vendr, shows about 10% average savings on roughly 700 Datadog deals; advisory guides disagree and quote 15% to 42% by commit size), 10% kept at renewal (anecdotal 5% per-SKU uplifts; measured general-SaaS renewal uplifts of 3% to 9%, settling near 12% where AI pricing is involved), and 20% annual growth (Datadog reports dollar-based net retention of about 120% from existing customers). The headline list prices modeled here ($15/$23 infrastructure, $31 APM, $0.10 per GB, $1.70 per million events) have not risen in the trackers we checked, although Datadog repriced Cloud Cost Management and redefined the Database Monitoring billing unit in 2026; escalation is therefore modeled as discount erosion plus volume growth, with no separate list-price inflation, so the two are not double counted. It is an illustration, not a forecast.',
+  'Not priced on either side: incident paging and on-call seats, network monitoring (IBM network observability is a separate product), security, serverless functions, LLM and GPU observability, extended retention, professional services. Broader vendor bundles that include those products cost more per host than the capabilities compared here. The log-volume and session, test-run and database-host assumptions from the Datadog model are applied to every platform so the rows stay comparable; host memory (16 to 32 GiB), containers per host (10), telemetry GB per host and users per host are additional assumptions for the usage-priced platforms. Optimization upside uses the 35% annual public cloud consumption cost reduction modeled for the composite organization in Forrester’s Total Economic Impact study of IBM Turbonomic (January 2024, commissioned by IBM), shown at half and at full rate; a named customer reported 43%, with 25% attributed to Turbonomic. Your contract, discounts, country pricing and taxes will change every figure.'
+];
+
+const EVID = [
+  { t:'Datadog pricing', s:'Public list prices, billed annually, per product, US region. Read 18 Oct 2026.', u:'https://www.datadoghq.com/pricing/' },
+  { t:'Dynatrace Platform Subscription rate card', s:'Public DPS list rates per hour, per GiB and per session. Read 18 Oct 2026.', u:'https://www.dynatrace.com/pricing/' },
+  { t:'New Relic pricing', s:'Public usage-based list prices: per-GB ingest and per-user editions. Read 18 Oct 2026.', u:'https://newrelic.com/pricing' },
+  { t:'Grafana Cloud pricing', s:'Public Pro tier usage rates and included allowances. Read 18 Oct 2026.', u:'https://grafana.com/pricing/' },
+  { t:'Splunk Observability Cloud pricing', s:'Public per-host tier prices, billed annually. Read 18 Oct 2026.', u:'https://www.splunk.com/en_us/products/pricing/observability.html' },
+  { t:'Datadog billing documentation', s:'Host, container, custom metric and log billing rules, overage premiums.', u:'https://docs.datadoghq.com/account_management/billing/' },
+  { t:'IBM Instana pricing and IBM Store', s:'Tiers, fair-use data allowance, add-ons on ibm.com; per-MVS list prices from the IBM Store configurator.', u:'https://www.ibm.com/store/en/us/products/EID3ZSCY' },
+  { t:'IBM Turbonomic SaaS on AWS Marketplace', s:'Public 12-month contract listing: 200 MVS for $37,909.82. On-premises listing: $50,760.', u:'https://aws.amazon.com/marketplace/pp/prodview-5r3k3snu4ttnm' },
+  { t:'Forrester TEI of IBM Instana Observability, December 2023', s:'Composite organization: 219% ROI, MTTR reduced 70%, revenue-impacting incidents reduced up to 60%, SRE/DevOps productivity up 40%, developer troubleshooting time down 90%. Commissioned by IBM; 7 interviewees at 4 organizations.', u:'https://tei.forrester.com/go/ibm/instanaobservability' },
+  { t:'Forrester TEI of IBM Turbonomic, January 2024', s:'Composite organization: 247% ROI, payback under six months, 35% annual reduction in public cloud consumption cost. Commissioned by IBM; 6 interviewees at 4 organizations.', u:'https://ibm.com/downloads/cas/06WG7WJB' },
+  { t:'IBM case studies: Leaf Group, Dahl, Evides', s:'Leaf Group: 66% monitoring cost reduction (2021). Dahl: 10 tools to 4 (2026). Evides: 43% cloud cost reduction, 25% attributed to Turbonomic. Illustrative only; results vary.', u:'https://www.ibm.com/case-studies/leaf-group' },
+  { t:'Datadog SEC filings', s:'Dollar-based net retention about 120% (Dec 2025) and low 120s (Mar and Jun 2026), used as the existing-customer spend-growth proxy.', u:'https://www.sec.gov/Archives/edgar/data/1561550/000162828026008819/ddog-20251231.htm' }
+];
+
+function renderStatic() {
+  $('footnotes').innerHTML = [...FOOT_COMP[S.comp], ...FOOT].map(f => `<li>${esc(f)}</li>`).join('');
+  $('evidence').innerHTML = '<div class="scope">Forrester Total Economic Impact figures are projections for a composite organization in studies commissioned by IBM; they describe that composite, not a guarantee for any other organization, and are cited here as context rather than as a comparison between vendors.</div>' + EVID.map(e => `<div><b><a href="${e.u}" target="_blank" rel="noopener">${esc(e.t)}</a></b><small>${esc(e.s)}</small></div>`).join('');
+  const rows = [
+    ['Datadog Infrastructure Pro / Enterprise', '$15 / $23', 'per host per month'], ['Datadog containers beyond allotment', '$1', 'per container per month, prepaid'], ['Datadog custom metrics beyond allotment', '$5 indexed / $0.10 ingested', 'per 100 metrics per month'],
+    ['Datadog APM / APM Enterprise (with Infrastructure)', '$31 / $40', 'per host per month; standalone $36 / $47'], ['Datadog log ingestion', '$0.10', 'per GB'], ['Datadog log indexing, 15-day', '$1.70', 'per million events'],
+    ['Datadog Database Monitoring', '$70', 'per database host per month'], ['Datadog RUM Measure + Investigate', '$0.15 + $3', 'per 1,000 sessions'], ['Datadog Synthetic API / browser tests', '$5 / $12', 'per 10,000 / per 1,000 runs'],
+    ['Datadog Cloud Cost Management Pro / Enterprise', '$5 / $10', 'per $1,000 of monthly cloud and SaaS spend'],
+    ['IBM Instana Essentials / Standard (SaaS)', '$21.20 / $79.50', 'per MVS per month, all tier features included'], ['IBM Instana fair-use data allowance', '50 GB / 325 GB', 'per MVS per month, pooled; $21.20 per 100 GB above'], ['IBM Instana Logs in context', 'from $0.351', 'per GB, 30-day retention'],
+    ['IBM Turbonomic (AWS Marketplace, SaaS / on-prem)', '$15.80 – $21.15', 'per MVS per month'],
+    ['Dynatrace Infrastructure / Full-Stack / Database', '$0.04 per host-hour / $0.01 per GiB-hour / $0.11 per instance-hour', 'about $29.20 / $58.40 per 8 GiB / $80.30 per month'], ['Dynatrace logs ingest / RUM', '$0.20 per GiB / $2.25 per 1,000 sessions', 'plus retention and query rates'],
+    ['New Relic ingest / full-platform user (Pro)', '$0.40–$0.60 per GB / $349', 'beyond 100 GB free / per user per month'],
+    ['Grafana Cloud Pro metrics / logs / Application Observability', '$6.50 per 1k series / $0.45–$0.55 per GB / $18', 'per month, 95th percentile / per host'],
+    ['Splunk Observability Infrastructure / App & Infra / End-to-End', '$15 / $60 / $75', 'per host per month, billed annually']
+  ];
+  const vendorOf = x => /^Datadog/.test(x) ? 'datadog' : /^Dynatrace/.test(x) ? 'dynatrace' : /^New Relic/.test(x) ? 'newrelic' : /^Grafana/.test(x) ? 'grafana' : /^Splunk/.test(x) ? 'splunk' : null;
+  const shown = rows.filter(x => !vendorOf(x[0]) || CFG.platforms.includes(vendorOf(x[0])));
+  $('priceTable').innerHTML = `<table><thead><tr><th>Item</th><th class="r">List price</th><th>Unit</th></tr></thead><tbody>${shown.map(x => `<tr><td>${esc(x[0])}</td><td class="r">${esc(x[1])}</td><td>${esc(x[2])}</td></tr>`).join('')}</tbody></table>`;
+  $('disclaimer').textContent = 'The results shown are illustrative, based on public list prices and the stated assumptions, and are provided for discussion only. They are not a quote, a guarantee or a commitment regarding any pricing, savings or results you may achieve, may not be incorporated into any contract, and create no liability or obligation for IBM. Actual costs depend on your environment, usage, configuration, contract terms and business conditions. IBM, Instana and Turbonomic are trademarks or registered trademarks of International Business Machines Corporation. Datadog is a trademark of Datadog, Inc. Forrester and Total Economic Impact are trademarks of Forrester Research, Inc. AWS and AWS Marketplace are trademarks of Amazon.com, Inc. or its affiliates. Other product and service names might be trademarks of IBM or other companies. The calculator is provided "as is" without warranty of any kind.';
+
+}
+
+/* ---------- inputs ---------- */
+function setSeg(id, v) { document.querySelectorAll('#' + id + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v) === String(v) ? 'true' : 'false')); }
+function syncUI() {
+  $('hosts').value = S.hosts || ''; $('spend').value = S.spend || ''; $('cloud').value = S.cloud || ''; $('onprem').checked = S.onprem; $('multi').checked = S.multi;
+  document.querySelectorAll('#hostChips .chip').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.hosts) === S.hosts ? 'true' : 'false'));
+  document.querySelectorAll('#caps .tile').forEach(t => t.setAttribute('aria-pressed', S.caps.includes(t.dataset.id) ? 'true' : 'false'));
+  $('logSub').hidden = !S.caps.includes('logs');
+  setSeg('comp', S.comp); setSeg('logVol', S.logVol); setSeg('tools', S.tools); setSeg('mttr', S.mttr); setSeg('catch', S.catch); setSeg('ctx', S.ctx); setSeg('just', S.just);
+  $('yearsOn').checked = S.years; $('d1').value = S.d1; $('d2').value = S.d2; $('g').value = S.g; $('di').value = S.di; $('sw').value = S.sw || '';
+  $('cloud').disabled = S.onprem; $('cloudWrap').classList.toggle('off', S.onprem);
+}
+function update(fn) { fn(); syncUI(); render(); }
+function syncExpandAll() { const ds = [...document.querySelectorAll('#cards details')]; const all = ds.length > 0 && ds.every(d => d.open); const b = $('expandAll'); b.textContent = all ? 'Collapse all' : 'Expand all'; b.setAttribute('aria-expanded', all ? 'true' : 'false'); b.hidden = ds.length === 0; }
+
+function buildInputs() {
+  $('caps').innerHTML = CAPS.map(c => `<button class="tile" type="button" data-id="${c.id}" aria-pressed="false"><b>${esc(c.name)}</b><small>${esc(c.sub)}</small><span class="ck" aria-hidden="true"></span></button>`).join('');
+  document.querySelectorAll('#caps .tile').forEach(t => t.addEventListener('click', () => update(() => { const id = t.dataset.id; S.caps = S.caps.includes(id) ? S.caps.filter(x => x !== id) : [...S.caps, id]; })));
+  document.querySelectorAll('#logVol button').forEach(b => b.addEventListener('click', () => update(() => S.logVol = b.dataset.v)));
+  document.querySelectorAll('#comp button').forEach(b => b.addEventListener('click', () => update(() => { S.comp = b.dataset.v; S.d1 = COMP[S.comp].d1; S.d2 = COMP[S.comp].d2; renderStatic(); })));
+  $('multi').addEventListener('change', () => update(() => S.multi = $('multi').checked));
+  ['tools','mttr','catch','ctx','just'].forEach(id => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => update(() => S[id] = Number(b.dataset.v)))));
+  $('hosts').addEventListener('input', () => { const v = $('hosts').value; S.hosts = v === '' ? 0 : clamp(Math.round(Number(v)) || 0, 0, 100000); document.querySelectorAll('#hostChips .chip').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.hosts) === S.hosts ? 'true' : 'false')); render(); });
+  $('hosts').addEventListener('blur', () => { if (S.hosts > 0 && S.hosts < 10) { S.hosts = 10; toast('The minimum order is 10 hosts; priced at 10.'); } syncUI(); render(); });
+  document.querySelectorAll('.num .step').forEach(b => b.addEventListener('click', () => update(() => S.hosts = clamp(S.hosts + Number(b.dataset.step), 10, 100000))));
+  document.querySelectorAll('#hostChips .chip').forEach(b => b.addEventListener('click', () => update(() => S.hosts = Number(b.dataset.hosts))));
+  $('spend').addEventListener('input', () => { ex.spend = false; S.spend = Math.max(0, Number($('spend').value) || 0); render(); });
+  $('cloud').addEventListener('input', () => { ex.cloud = false; S.cloud = Math.max(0, Number($('cloud').value) || 0); render(); });
+  $('onprem').addEventListener('change', () => update(() => { S.onprem = $('onprem').checked; ex.cloud = false; }));
+  $('yearsOn').addEventListener('change', () => update(() => S.years = $('yearsOn').checked));
+  ['d1','d2','g','di'].forEach(id => $(id).addEventListener('input', () => { S[id] = clamp(Number($(id).value) || 0, 0, 100); render(); }));
+  $('sw').addEventListener('input', () => { S.sw = Math.max(0, Number($('sw').value) || 0); render(); });
+  $('expandAll').addEventListener('click', () => { const ds = [...document.querySelectorAll('#cards details')]; const open = !ds.every(d => d.open); ds.forEach(d => d.open = open); syncExpandAll(); });
+  $('cards').addEventListener('toggle', syncExpandAll, true);
+  $('reset').addEventListener('click', () => { S = { ...DEFAULTS, caps:[...DEFAULTS.caps] }; ex = { spend:true, cloud:true }; firstCards = true; syncUI(); renderStatic(); render(); toast('Reset to example answers'); });
+  $('pdf').addEventListener('click', () => { toast('Choose "Save as PDF" in the print dialog'); setTimeout(() => window.print(), 50); });
+  $('share').addEventListener('click', async () => { const url = location.href.split('#')[0] + '#' + params(); try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch (e) { toast('Copy blocked by the browser. Copy the address bar instead.'); } });
+  $('copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(summaryText()); toast('Summary copied'); } catch (e) { toast('Copy blocked by the browser. Select the page text instead.'); } });
+  let openState = [];
+  window.addEventListener('beforeprint', () => { const ds = [...document.querySelectorAll('details')]; openState = ds.map(d => d.open); ds.forEach(d => d.open = true); });
+  window.addEventListener('afterprint', () => { [...document.querySelectorAll('details')].forEach((d, i) => d.open = openState[i]); });
+}
+function summaryText() {
+  const r = compute();
+  const L = ['IBM observability cost calculator, estimate at public list prices', 'Generated ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), ''];
+  L.push(`Annual observability spend: ${S.spend > 0 ? full(S.spend) + (ex.spend ? ' (example)' : '') : 'not given'}`, `Platform today: ${COMP[S.comp].name}${S.multi ? ' (more than one platform in use)' : ''}`, `Hosts: ${S.hosts.toLocaleString('en-US')}`, `Capabilities: ${CAPS.filter(c => S.caps.includes(c.id)).map(c => c.name).join(', ')}${S.caps.includes('logs') ? ' (logs ' + S.logVol + ', ' + P.dd.logs.gb[S.logVol] + ' GB/host/month)' : ''}`, `Tools in stack: ${SEGS.tools[S.tools] || '-'}`, `Incidents: ${SEGS.mttr[S.mttr] || '-'}; catch before users: ${SEGS.catch[S.catch] || '-'}; app+network context: ${SEGS.ctx[S.ctx] || '-'}; outcomes justify spend: ${SEGS.just[S.just] || '-'}`, `Monthly cloud bill: ${S.onprem ? 'mostly on-prem' : (S.cloud > 0 ? full(S.cloud) + (ex.cloud ? ' (example)' : '') : 'not given')}`, '');
+  if (r.state !== 'none') {
+    L.push(`${r.comp.name} (list): ${full(r.dd)} per year${r.unpriced.length ? ' (excludes ' + r.unpriced.map(u => u.name.toLowerCase()).join(', ') + ')' : ''}; ${r.segs.map(s => s.name + ' ' + full(s.yr)).join(', ')}`);
+    L.push(`IBM Concert (list, priced at Instana): ${full(r.ibm)} per year; ${r.ibmSegs.map(s => s.name + ' ' + full(s.yr)).join(', ')}`);
+    L.push(`Per host per month: ${r.comp.name} $${(r.dd/12/r.h).toFixed(0)}; IBM Concert $${(r.ibm/12/r.h).toFixed(0)}`);
+    L.push(`On list prices: ${side(r.diff)} per year.`, `Summary: ${$('headline').textContent}`, '');
+    if (r.netOn) L.push(`Net of everything with IBM Concert Observe + Optimize: ${r.netMax >= 0 ? 'up to ' : ''}${full(r.netMax)} a year (${side(r.diff)} on tools; cloud savings up to ${full(r.optMax)}; Turbonomic ${full(-r.turbo)}); ${full(r.netHalf)} at half the optimization rate; return on IBM list spend ${Math.round(r.roiMax * 100)}% (${Math.round(r.roiHalf * 100)}% at half rate).`, '');
+    const gi = gapItems(S.comp, S.caps);
+    if (gi.ontop.length || gi.separate.length) { L.push(`What the ${r.comp.name} list price does not include (${r.comp.name} price list, checked ${GAPS[S.comp].checked}):`); gi.ontop.forEach(i => L.push(`- ${i.item}: ${i.price}${i.unit ? ' ' + i.unit : ''}${i.when ? ' | ' + i.when : ''}`)); gi.separate.forEach(i => L.push(`- Separate product, ${i.item}: ${i.price}${i.unit ? ' ' + i.unit : ''}`)); L.push(''); }
+    if (r.cloudYr) L.push(`Beyond the observability platform${CFG.mode === 'net' ? ' (counted in the net benefit)' : ' (separate)'}: IBM Concert Optimize, powered by Turbonomic, up to ${full(r.cloudYr * 0.35)} a year off a ${full(r.cloudYr)} cloud bill (35%, Forrester composite; ${full(r.cloudYr * 0.175)} at half rate); Turbonomic lists at about ${full(r.hosts * P.ibm.turbo * 12)} a year for ${r.hosts.toLocaleString('en-US')} hosts`, '');
+    L.push('Where to look first:'); document.querySelectorAll('#cards details').forEach(c => L.push('- ' + c.dataset.k + (c.querySelector('.ask') ? ' | Worth asking: ' + c.querySelector('.ask').textContent.replace('Worth asking: ', '') : '')));
+  }
+  L.push('', 'Reproduce: ' + location.href.split('#')[0] + '#' + params(), 'Estimates for IBM Concert Observe + Optimize, powered by IBM Instana and IBM Turbonomic, at public list prices. Not a quote. See the footnotes on the calculator page.');
+  return L.join('\n');
+}
+function toast(m) { const t = $('toast'); t.textContent = m; clearTimeout(t._h); t._h = setTimeout(() => t.textContent = '', 2800); }
+
+/* ---------- share link ---------- */
+const params = () => new URLSearchParams({ v:S.comp, mp:S.multi ? 1 : 0, h:S.hosts, c:S.caps.join('.'), lv:S.logVol, s:S.spend || 0, t:S.tools, m:S.mttr, k:S.catch, x:S.ctx, j:S.just, cb:S.cloud || 0, op:S.onprem ? 1 : 0, y:S.years ? 1 : 0, d1:S.d1, d2:S.d2, g:S.g, di:S.di, sw:S.sw || 0 }).toString();
+let hashT;
+function writeHash() { clearTimeout(hashT); hashT = setTimeout(() => { try { history.replaceState(null, '', '#' + params()); } catch (e) {} }, 400); }
+function readHash() {
+  if (!location.hash || location.hash.length < 2) return false;
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (!p.has('h')) return false;
+  const n = (k, d) => { const v = Number(p.get(k)); return p.has(k) && Number.isFinite(v) ? v : d; };
+  S = { comp: COMP[p.get('v')] ? p.get('v') : CFG.platforms[0], multi: p.get('mp') === '1', hosts: clamp(n('h', DEFAULTS.hosts), 0, 100000), caps: (p.get('c') || '').split('.').filter(x => CAPS.some(c => c.id === x)), logVol: ['light','typical','heavy'].includes(p.get('lv')) ? p.get('lv') : 'typical', spend: Math.max(0, n('s', 0)), tools: n('t', 0), mttr: n('m', 0), catch: n('k', 0), ctx: n('x', 0), just: n('j', 0), cloud: Math.max(0, n('cb', 0)), onprem: p.get('op') === '1', years: p.get('y') !== '0', d1: clamp(n('d1', 20), 0, 100), d2: clamp(n('d2', 10), 0, 100), g: clamp(n('g', 20), 0, 100), di: clamp(n('di', 0), 0, 100), sw: Math.max(0, n('sw', 0)) };
+  ex = { spend:false, cloud:false }; return true;
+}
+
+buildInputs(); renderStatic(); readHash(); syncUI(); render();
+</script>
+</body>
+</html>
